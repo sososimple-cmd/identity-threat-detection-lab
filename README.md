@@ -1,157 +1,266 @@
 # The Ghost Account: Identity Threat Detection Lab
 
-**The Employee Left. Their Access Didn't.**
+### The Employee Left. Their Access Didn't.
 
-*Detecting password spraying, suspicious terminated-account authentication, and unauthorized privilege changes using Python, Grafana Loki, and LogQL.*
+**Detecting password spraying, suspicious terminated-account authentication, and unauthorized privilege changes using Python, Grafana Loki, and LogQL.**
 
-**Technologies:** Python 3 · OrangeHRM · Authentik · Grafana Loki · LogQL · Grafana
+**Technologies:** Python 3 | OrangeHRM | Authentik | Grafana Loki | LogQL | Grafana
 
-**Status:** Implementation completed and validated | October 2026
+**Status:** Completed and validated — October 2026
 
 ---
 
 ## 1. The Problem — When Identity Controls Fail, Who Detects It?
 
-Employee termination should trigger the removal of access to corporate systems. However, organizations can still face security risks from compromised credentials, stale permissions, unauthorized privilege changes, and gaps in identity monitoring.
+Terminating an employee should trigger the immediate removal of access to corporate systems. However, compromised credentials, stale permissions, lingering sessions, and unauthorized privilege changes can expose organizations to continued identity-based threats.
 
-A security team needs to answer three critical questions:
+Security teams need to detect three particularly concerning behaviors:
 
-- Can we identify password-spraying activity before an attacker compromises an account?
-- Can we detect suspicious authentication involving a terminated identity?
-- Can we identify unauthorized privilege changes before they go unnoticed?
+- **Password spraying:** Repeated authentication failures across multiple user accounts from a common source.
+- **Terminated-account authentication:** Successful login activity associated with an identity that should no longer have access.
+- **Unauthorized privilege escalation:** Elevated permissions granted without appropriate approval.
 
-**Business impact:** Without adequate detection coverage, suspicious account activity may remain undetected, increasing the risk of unauthorized access, data exposure, and privileged-account compromise.
+**Business Impact:** Without effective identity threat monitoring, unauthorized access attempts and privilege changes may remain undetected, increasing the risk of account compromise, data exposure, and lateral movement.
 
-The challenge was to build a monitoring solution that could identify these behaviors, distinguish suspicious activity from ordinary authentication failures, and produce actionable alerts.
+**The challenge:** Build a detection pipeline capable of identifying suspicious authentication patterns, distinguishing threats from ordinary login failures, and automatically alerting defenders when suspicious activity exceeds defined thresholds.
 
-## 2. The Solution — Building an Identity Threat Detection Pipeline
+## 2. The Solution — An Identity Threat Detection Pipeline
 
-I developed an identity threat detection pipeline using **Python, Grafana Loki, LogQL, and Grafana** to identify suspicious authentication and privileged-access activity.
+I developed an end-to-end identity threat detection pipeline using Python, Grafana Loki, LogQL, and Grafana.
 
-The solution uses structured security events to detect three identity threats:
+The solution delivers:
 
-1. **Password spraying:** Multiple accounts targeted by failed logins from the same source IP.
-2. **Terminated-account access:** Successful authentication associated with a terminated employee.
-3. **Unauthorized privilege escalation:** An unapproved addition to the Administrators group.
+1. **Centralized security event ingestion** for structured authentication and privileged-access logs.
+2. **Three detection queries** identifying password spraying, terminated-account login events, and unauthorized administrator assignments.
+3. **A centralized Grafana dashboard** for investigating suspicious activity.
+4. **Automated password-spray alerting** when five or more distinct accounts are targeted from the same source IP within five minutes.
+5. **Validation testing** confirming suspicious behaviors are detected while normal login failures remain below the alert threshold.
 
-I also configured an automated Grafana alert to identify password-spraying activity when five or more distinct accounts experienced failed authentication from the same IP within five minutes.
-
-The detection logic was validated through controlled, synthetic attack scenarios.
+The implementation combines IAM lifecycle context with security monitoring to demonstrate how identity risks can be identified through event analysis and automated detection.
 
 ## 3. How I Implemented the Solution
 
-| Phase | Engineering work performed |
+| Phase | Engineering Work |
 |---|---|
-| Identity verification | Reviewed Billy Kaplan's termination in OrangeHRM and confirmed his Authentik account was inactive |
-| Event generation | Developed and executed Python scripts generating 10 structured synthetic security events |
-| Log ingestion | Sent JSON events into Grafana Loki using its HTTP ingestion API |
-| Detection engineering | Implemented three LogQL queries targeting password spraying, terminated-account logins, and unauthorized administrator assignments |
-| Security monitoring | Built a three-panel Grafana dashboard to investigate suspicious activity |
-| Automated alerting | Configured a threshold-based password-spray alert with a one-minute evaluation interval |
-| Validation | Tested suspicious and normal activity, confirmed log ingestion, and verified Grafana alert state history |
+| Identity Verification | Verified Billy Kaplan's termination record in OrangeHRM and inactive identity in Authentik |
+| Event Generation | Developed Python scripts generating 10 synthetic authentication and access-change events |
+| Log Ingestion | Submitted structured JSON events through Loki's HTTP ingestion API |
+| Detection Logic | Developed LogQL queries targeting three identity threat patterns |
+| Security Monitoring | Created a three-panel Grafana investigation dashboard |
+| Automated Alerting | Configured a password-spray alert with a one-minute evaluation interval |
+| Validation | Tested detection conditions, ingestion, query results, and alert state transitions |
 
-### Detection Pipeline
+### Security Detection Pipeline Architecture
 
-```text
-HR / Identity Verification
-          |
-          v
-Python Security Event Generator
-          |
-          v
-Grafana Loki — Centralized Logs
-          |
-          v
-LogQL — Detection Logic
-          |
-          v
-Grafana — Investigation Dashboard
-          |
-          v
-Automated Password-Spray Alert
-          |
-          v
-Security Investigation and Validation
-```
+### Security Detection Pipeline Architecture
 
-The HR and identity records provide verified lifecycle context. The authentication and privilege-change incident itself was simulated rather than executed against actual user accounts.
+![Security Detection Pipeline](evidence/screenshots/security-detection-pipeline.png)
+
+**Architecture notes:** The dashed connections represent verified HR and identity context, not automated integrations. The Python generator creates synthetic security events independently of OrangeHRM and Authentik. Solid connections represent the implemented event submission, querying, and monitoring workflow.
 
 ## 4. Results — What the Solution Detected
 
-| Detection or validation | Observed result |
+The detection pipeline successfully identified the simulated suspicious activity, retrieved security events through Grafana, and triggered an automated password-spray alert.
+
+| Detection / Validation | Verified Result |
 |---|---|
 | Password spraying | 6 distinct accounts targeted from one source IP |
 | Normal failed authentication | 1 account from a separate IP, below the threshold |
-| Terminated identity authentication | 1 matching synthetic successful-login event |
-| Unauthorized administrator assignment | 1 matching synthetic privilege-change event |
-| Python validation tests | 4 of 4 passed |
-| Loki ingestion | HTTP 204 success |
-| Grafana investigation | 10 synthetic events retrieved |
-| Automated password-spray alert | Successfully entered Alerting/Firing state |
+| Terminated-account authentication | 1 matching synthetic successful-login event |
+| Unauthorized privilege escalation | 1 matching synthetic administrator-group addition |
+| Python validation | 4 of 4 local checks passed |
+| Loki ingestion | HTTP 204 |
+| Security events retrieved | 10 synthetic events |
+| Detection queries | 3 successfully tested |
+| Grafana monitoring | 3 working investigation panels |
+| Automated password-spray alert | Entered Firing / Alerting state |
 
-**Key outcome:** The detection pipeline distinguished a simulated password-spray pattern from normal failed authentication and generated an automated security alert that was confirmed through Grafana's recorded state history.
+### Security Detection Dashboard
 
-The terminated-login and administrator-change scenarios were validated through LogQL investigation queries. These were not separately configured as automatic alerts.
+I developed a three-panel Grafana dashboard to provide visibility into authentication failures, terminated-account login activity, and unauthorized privileged-group changes.
+
+![Identity Threat Detection Dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
+
+**Key Outcome:** The system identified six distinct accounts targeted by a simulated password spray, distinguished the suspicious pattern from isolated normal authentication failure, and automatically triggered a Grafana alert.
+
+The terminated-account and privilege-change patterns were validated through LogQL investigation queries. Only the password-spray detection was configured and tested as an automatic alert.
 
 ## 5. Security Investigation — The Ghost Account
 
-Billy Kaplan's HR record documented termination on October 10, 2026. An account review confirmed the corresponding Authentik identity was inactive.
+### Stage 1 — Employee Termination
 
-To test detection coverage against a hypothetical security control failure, I generated synthetic events representing:
+Billy Kaplan's HR record documented termination on October 10, 2026.
 
-1. Failed authentication attempts against six accounts.
-2. A successful login involving Billy's terminated identity.
-3. An unapproved administrator-group membership addition.
+An identity review confirmed that his corresponding Authentik account, `billy.kaplan`, was inactive.
 
-The password-spray rule identified the simulated source IP `203.0.113.25` and returned a distinct-account count of six.
+This established the expected access-control baseline: a terminated identity should not have active system access.
 
-The automatic alert was configured to evaluate every minute and trigger when the count exceeded four.
+### Stage 2 — Simulated Password Spraying
 
-Grafana state history confirmed:
+A controlled simulation generated failed authentication attempts against six different user accounts from the source IP:
 
-```text
-Source IP: 203.0.113.25
-Distinct accounts: 6
-Alert threshold: > 4
-Query result: A=6.000000
-Condition result: C=1.000000
-Alert state: Alerting
+`203.0.113.25`
+
+The dataset also included one ordinary failed-login event from another source IP.
+
+This created both a suspicious authentication pattern and a normal-activity comparison for validation.
+
+### Stage 3 — Suspicious Terminated-Account Authentication
+
+A synthetic security event recorded a successful login attributed to `billy.kaplan` while the event's employment status was marked as terminated.
+
+This represented a hypothetical access-control failure requiring security investigation.
+
+### Stage 4 — Unauthorized Privilege Change
+
+A subsequent synthetic event recorded an unapproved addition of `billy.kaplan` to the Administrators group.
+
+This modeled a potential privilege escalation following suspicious authentication activity.
+
+### Stage 5 — Detection and Investigation
+
+The synthetic security events were ingested into Loki and investigated using LogQL.
+
+Grafana returned matching records for all three suspicious behaviors.
+
+The password-spray alert automatically entered the Alerting/Firing state when the distinct-account threshold was exceeded.
+
+**Investigation scope:** The suspicious authentication and privilege-change events were simulated. They were not actual actions performed against Billy's inactive Authentik account.
+
+## 6. Detection Engineering — LogQL Implementation
+
+### Detection 1 — Password Spraying
+
+**Objective:** Identify multiple distinct accounts experiencing failed authentication from a common source IP within five minutes.
+
+```logql
+count by (source_ip) (
+  sum by (source_ip, username) (
+    count_over_time(
+      {job="identity_detection_lab", scenario="billy_kaplan"}
+      | json
+      | event_type="login"
+      | status="failed"
+      [5m]
+    ) > bool 0
+  )
+)
 ```
 
-No actual authentication or privilege change was performed against Billy's disabled account.
+**Observed Result:**
 
-## 6. Detection Queries and Technical Details
+- Suspicious IP: `203.0.113.25`
+- Distinct accounts targeted: 6
+- Detection window: 5 minutes
+- Automated alert threshold: Greater than 4
+- Result: Detection condition satisfied
 
-The repository's `queries/` directory contains the LogQL implementations for:
+The query counts distinct usernames rather than simply counting failed authentication events, helping distinguish a password-spray pattern from repeated attempts against a single account.
 
-- Password-spray detection using a five-minute rolling window and distinct username counts.
-- Successful-login investigation for terminated identities.
-- Detection of unapproved Administrators group membership additions.
+### Detection 2 — Terminated-Account Authentication
 
-The `scripts/` directory contains the Python event generator and local validation logic.
+**Objective:** Identify successful login events associated with terminated employment status.
 
-The accompanying documentation explains how the detection scenarios were reproduced, investigated, and tested.
+```logql
+{job="identity_detection_lab", scenario="billy_kaplan"}
+| json
+| event_type="login"
+| status="success"
+| employment_status="terminated"
+```
 
-## 7. Challenges and Troubleshooting
+**Observed Result:** One matching synthetic successful-login event for `billy.kaplan`.
 
-During implementation, Grafana initially failed to retrieve Loki logs because of incorrectly configured data source connections.
+In production, termination status should be corroborated against an authoritative HR or identity governance system rather than relying solely on an authentication event field.
 
-I separated ingestion testing from query troubleshooting, verified Loki readiness, confirmed successful HTTP event ingestion, and established a working Grafana data source connection.
+### Detection 3 — Unauthorized Privilege Escalation
 
-After resolving the configuration issue, I validated the query results and configured an automated alert.
+**Objective:** Detect unapproved membership additions to the Administrators group.
 
-This reinforced the importance of troubleshooting the complete security monitoring pipeline rather than assuming that successful log ingestion guarantees successful alerting.
+```logql
+{job="identity_detection_lab", scenario="billy_kaplan"}
+| json
+| event_type="group_membership_added"
+| target_group="Administrators"
+| approved="no"
+```
 
-## 8. Lessons Learned and Future Improvements
+**Observed Result:** One synthetic unapproved administrator-group membership addition associated with `billy.kaplan`.
 
-This project reinforced several detection engineering principles:
+Production implementations would require approval verification through authoritative access-request or change-management records.
 
-- **Detection quality:** Counting distinct accounts helps distinguish password spraying from repeated failures against one account.
-- **Identity context:** HR termination records and identity-provider status provide important context for investigating authentication anomalies.
-- **Alert validation:** A successful LogQL query does not guarantee that an alert rule will fire. Evaluation frequency, thresholds, and state transitions must be tested.
-- **Operational visibility:** Troubleshooting ingestion, data sources, queries, and alert conditions is essential to reliable security monitoring.
+## 7. Automated Alerting and Validation
 
-Future improvements include integrating authoritative identity lifecycle data with live authentication events, adding automated alerts for privilege changes and terminated-account logins, implementing Sigma rules, and creating incident-response playbooks.
+I configured a Grafana-managed password-spray alert to evaluate authentication activity automatically.
+
+### Alert Configuration
+
+| Parameter | Configuration |
+|---|---|
+| Alert Name | Ghost Account - Password Spray Detection |
+| Data Source | Grafana Loki |
+| Evaluation Interval | 1 minute |
+| Detection Window | 5 minutes |
+| Threshold | More than 4 distinct accounts |
+| Pending Period | 0 seconds |
+| Recorded State | Alerting / Firing |
+
+### Verified Alert Execution
+
+```text
+Alert: Ghost Account - Password Spray Detection
+
+Source IP: 203.0.113.25
+Distinct Accounts: 6
+Threshold: > 4
+
+Query Value: A=6.000000
+Condition Result: C=1.000000
+
+State: Alerting
+```
+
+Grafana recorded that the detection condition was satisfied.
+
+Subsequent state-history entries also reflected transitions to normal states as the query's matching activity aged outside the evaluation window or the alert configuration was updated.
+
+**Validation Result:** The alert rule successfully identified the simulated password-spraying pattern during automatic evaluation.
+
+## 8. Technical Challenges and Lessons Learned
+
+### Challenge 1 — Grafana Data Source Connectivity
+
+During implementation, Grafana initially failed to query Loki because of a data source connection configuration issue.
+
+I troubleshot the issue by separating ingestion verification from Grafana's query connection, checking Loki readiness, and confirming that event submission returned HTTP 204.
+
+After establishing a working Grafana data source, the synthetic logs were successfully retrieved and analyzed.
+
+**Lesson learned:** Successful log ingestion does not guarantee successful querying or alerting. Each stage of the monitoring pipeline must be validated independently.
+
+### Challenge 2 — Differentiating Suspicious Activity From Normal Authentication Failures
+
+A single failed login does not necessarily indicate an attack.
+
+The password-spray detection used distinct-account aggregation to identify multiple accounts targeted by a common source IP within a defined time window.
+
+**Lesson learned:** Effective detection engineering depends on meaningful aggregation, time windows, and thresholds—not just raw event counts.
+
+### Challenge 3 — Validating Automated Alerts
+
+A working LogQL query does not prove that an automated alert will trigger.
+
+I configured the evaluation interval, threshold, pending period, and alert state handling, then generated fresh synthetic events to validate execution.
+
+**Lesson learned:** Alert state history provides important evidence that detection rules are evaluated and can trigger under expected conditions.
+
+### Challenge 4 — Connecting IAM With Security Detection
+
+The HR termination record and inactive Authentik account established the expected identity lifecycle state.
+
+The simulated security events demonstrated how a defender might investigate activity inconsistent with that state.
+
+**Lesson learned:** Identity lifecycle context can strengthen authentication and privilege-change investigations.
 
 ## 9. Project Evidence
 
@@ -159,34 +268,101 @@ Future improvements include integrating authoritative identity lifecycle data wi
 
 **Employee termination — OrangeHRM**
 
-![Billy Kaplan termination](evidence/screenshots/01-hr-termination.png)
+![Billy Kaplan Termination](evidence/screenshots/01-hr-termination.png)
 
-**Disabled identity — Authentik**
+**Inactive identity — Authentik**
 
-![Billy Kaplan inactive identity](evidence/screenshots/02-authentik-inactive.png)
+![Billy Kaplan Inactive Account](evidence/screenshots/02-authentik-inactive.png)
 
-### Detection Implementation and Validation
+### Security Event Generation and Detection
 
-**Python validation — Four passing tests**
+**Python validation — Four passing checks**
 
-![Python validation results](evidence/screenshots/03-python-local-tests.png)
+![Python Detection Validation](evidence/screenshots/03-python-local-tests.png)
 
-**Synthetic security events collected in Loki**
+**Synthetic events collected in Loki**
 
-![Billy Kaplan Loki events](evidence/screenshots/04-billy-loki-events.png)
+![Loki Security Events](evidence/screenshots/04-billy-loki-events.png)
 
-**Three-panel Grafana detection dashboard**
+**Grafana investigation dashboard**
 
-![Grafana detection dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
+![Grafana Detection Dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
 
-**Automatic password-spray alert state history**
+**Automated alert state history**
 
-![Grafana alert state history](evidence/screenshots/10-billy-alert-history.png)
+![Grafana Alert State History](evidence/screenshots/10-billy-alert-history.png)
 
-## 10. Reproduction and Security Scope
+## 10. Reproducing the Detection Simulation
 
-The project uses Python-generated security events and documentation-only IP addresses. The incident activity is synthetic, and the HR and identity-state observations were verified separately.
+### Requirements
 
-The repository includes the event-generation scripts and detection queries. Reproducing Loki ingestion requires an authorized Loki environment.
+- Python 3
+- Authorized Grafana Loki environment
+- Grafana configured to query the Loki data source
 
-No real attacks, unauthorized account modifications, or production incidents occurred. Credentials and private infrastructure configuration are excluded from the repository.
+### Generate Synthetic Events
+
+```powershell
+py scripts/send_simulated_events.py --dry-run
+```
+
+### Validate Detection Conditions
+
+```powershell
+py scripts/validate_detection.py
+```
+
+### Configure a Loki Ingestion Endpoint
+
+```powershell
+$env:LOKI_PUSH_URL = "http://YOUR-LOKI-HOST:PORT/loki/api/v1/push"
+```
+
+### Submit Synthetic Security Events
+
+```powershell
+py scripts/send_simulated_events.py --send
+```
+
+### Investigate Security Events
+
+In Grafana Explore, run:
+
+```logql
+{job="identity_detection_lab", scenario="billy_kaplan"} | json
+```
+
+The `queries/` directory contains the saved detection queries and a proposed administrator-change alert query.
+
+Only the password-spray alert was configured and validated as an automated Grafana alert.
+
+## 11. Future Improvements
+
+Potential improvements include:
+
+- Correlating authoritative HR lifecycle events with live identity-provider authentication data.
+- Implementing additional automated alerts for terminated-account access and unauthorized privilege changes.
+- Developing Sigma rules for portable security detection logic.
+- Enriching authentication events with additional user, device, and source context.
+- Introducing alert severity classifications and incident response playbooks.
+- Expanding validation coverage to include duplicate events, false positives, ingestion failures, and additional attack scenarios.
+
+## 12. Security and Testing Scope
+
+This project used controlled synthetic security events and documentation-only IP addresses.
+
+Billy Kaplan's termination and inactive Authentik status were independently verified as identity lifecycle context. The suspicious login, password-spray activity, and privileged-group change were simulated using Python.
+
+No actual unauthorized login, account compromise, privilege escalation, or real password-spray attack was performed.
+
+Sensitive credentials and private infrastructure details are excluded from the repository.
+
+---
+
+## Project Outcome
+
+**Built and validated an end-to-end identity threat detection pipeline using Python, Grafana Loki, LogQL, and Grafana.**
+
+The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
+
+By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
