@@ -1,0 +1,1 @@
+{job="identity_detection_lab", scenario="billy_kaplan"} | json | event_type="login" | status="success" | employment_status="terminated"
