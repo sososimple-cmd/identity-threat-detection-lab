@@ -50,7 +50,6 @@ The implementation combines IAM lifecycle context with security monitoring to de
 | Automated Alerting | Configured a password-spray alert with a one-minute evaluation interval |
 | Validation | Tested detection conditions, ingestion, query results, and alert state transitions |
 
-### Security Detection Pipeline Architecture
 
 ### Security Detection Pipeline Architecture
 
