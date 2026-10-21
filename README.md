@@ -185,6 +185,30 @@ count by (source_ip) (
 
 The query counts distinct usernames rather than simply counting failed authentication events, helping distinguish a password-spray pattern from repeated attempts against a single account.
 
+### Password-Spray Timing and Window Validation
+
+**Objective:** Verify that password-spray detection correctly evaluates distinct usernames within a rolling five-minute window.
+
+**Implementation:** Generated six synthetic failed authentication attempts from one documentation-only source IP, targeting six different accounts at 30-second intervals over 150 seconds.
+
+**Loki API Validation Results:**
+
+| Test | Expected | Observed | Result |
+|---|---|---|---|
+| All attempts within five minutes | 6 accounts | 6 accounts | PASS |
+| Advance window to exclude earliest attempts | 4 accounts | 4 accounts | PASS |
+
+The tests executed LogQL against Loki using historical evaluation timestamps, demonstrating that earlier attempts expire from the rolling window.
+
+**Validation Script:** `scripts/validate_spray_window.py`
+
+**Evidence:**
+- [Realistic Spray Detection Validation](evidence/screenshots/07-realistic-spray-validation.png)
+- [Five-Minute Boundary Test](evidence/screenshots/08-spray-window-boundary-test.png)
+
+**Scope:** These tests validate Loki query results and window boundaries, not Grafana alert firing or production false-positive rates.
+
+---
 ### Detection 2 — HR-Correlated Ghost Account Detection
 
 **Objective:** Identify successful authentication events associated with terminated employees by correlating two separate data sources.
@@ -413,6 +437,7 @@ Sensitive credentials and private infrastructure details are excluded from the r
 The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
 
 By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
+
 
 
 
