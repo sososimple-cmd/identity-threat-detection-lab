@@ -6,7 +6,7 @@
 
 **Technologies:** Python 3 | OrangeHRM | Authentik | Grafana Loki | LogQL | Grafana
 
-**Status:** Completed and validated — October 2026
+**Status:** Detection scenarios validated in a controlled lab — October 2026
 
 ---
 
@@ -33,8 +33,8 @@ The solution delivers:
 1. **Centralized security event ingestion** for structured authentication and privileged-access logs.
 2. **Three detection queries** identifying password spraying, terminated-account login events, and unauthorized administrator assignments.
 3. **A centralized Grafana dashboard** for investigating suspicious activity.
-4. **Automated password-spray alerting** when five or more distinct accounts are targeted from the same source IP within five minutes.
-5. **Validation testing** confirming suspicious behaviors are detected while normal login failures remain below the alert threshold.
+4. **Three Grafana-managed automated alerts** for password spraying, HR-correlated post-termination logins, and simulated unauthorized administrator changes.
+5. **Layered validation:** five local Python checks, four Loki API checks, two rolling-window boundary checks, and recorded alert firing/recovery states.
 
 The implementation combines IAM lifecycle context with security monitoring to demonstrate how identity risks can be identified through event analysis and automated detection.
 
@@ -47,8 +47,8 @@ The implementation combines IAM lifecycle context with security monitoring to de
 | Log Ingestion | Submitted structured JSON events through Loki's HTTP ingestion API |
 | Detection Logic | Developed LogQL queries targeting three identity threat patterns |
 | Security Monitoring | Created a three-panel Grafana investigation dashboard |
-| Automated Alerting | Configured a password-spray alert with a one-minute evaluation interval |
-| Validation | Tested detection conditions, ingestion, query results, and alert state transitions |
+| Automated Alerting | Configured three Grafana-managed alert rules; evaluated every minute in the Detection Lab |
+| Validation | Passed 5 local Python tests, 4 Loki API tests, and 2 rolling-window boundary checks; captured alert firing/recovery history |
 
 
 ### Security Detection Pipeline Architecture
@@ -62,10 +62,10 @@ flowchart TB
 
     subgraph LAB["Implemented Detection Lab"]
         HR["HR Termination CSV"]
-        GEN["Python Generator: 10 Synthetic Events"]
+        GEN["Python Generator: 10 Synthetic Source Events"]
         CORR["Python HR and Authentication Correlation"]
         FIND["Ghost Account Finding: 1 Record"]
-        LOKI["Grafana Loki: 11 Total Records"]
+        LOKI["Grafana Loki: 11 Records per Full Batch"]
         HUNTS["LogQL: Three Investigation Queries"]
         ALERT["Grafana: Three Automated Alerts"]
         DASH["Grafana: 3 Investigation Panels"]
@@ -81,27 +81,28 @@ flowchart TB
     end
 ```
 
-**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. The lab generates 10 source events and 1 derived ghost-account finding, sends 11 records to Loki, and uses Grafana for investigations and three automated detection alerts. All three lab detection scenarios now have automated Grafana alert rules.
+**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. Each full simulation batch generates 10 source events and one derived ghost-account finding (11 Loki records). Separate controlled events were later sent to verify individual alert firing. All three detection scenarios have Grafana-managed alert rules; the two newer rules use a contact point with no notification integrations.
 
 ## 4. Results — What the Solution Detected
 
-The lab detected simulated suspicious activity, ingested 11 records into Loki, retrieved an HR-correlated ghost-account finding through Grafana, and demonstrated an automated password-spray alert. All three detection scenarios now have automated alerts, while saved LogQL queries remain available for manual investigation.
+A full simulation batch produced 10 synthetic source events and one HR-correlated finding, accepted by Loki with HTTP 204. The saved LogQL queries returned expected results through the Loki API. Three Grafana-managed rules were configured; alert firing and recovery were observed in controlled lab tests. Separate alert tests sent additional synthetic records after the original full batch.
 
 | Detection / Validation | Verified Result |
 |---|---|
 | Password spraying | 6 distinct accounts targeted from one source IP |
 | Normal failed authentication | 1 account from a separate IP, below the threshold |
-| Terminated-account authentication | 1 matching synthetic successful-login event |
+| Terminated-account authentication | 1 correlated ghost-account finding from a separate HR CSV and a synthetic successful-login event |
 | Unauthorized privilege escalation | 1 matching synthetic administrator-group addition |
 | Python validation | 5 of 5 local Python validation checks passed |
-| Live Loki API validation | 4 of 4 checks passed using scripts/validate_loki.py |
+| Live Loki API validation | 4 of 4 checks passed using `scripts/validate_loki.py` |
 | Loki API results | 6 password-spray accounts, 1 HR-correlated ghost-account finding, 1 unauthorized admin change, and normal activity below threshold |
 | Loki API evidence | [View screenshot](evidence/screenshots/06-loki-api-validation.png) |
+| Five-minute boundary test | 2 of 2 Loki time-window checks passed (6 accounts counted, then 4 after earlier attempts aged out) |
 | Loki ingestion | HTTP 204 |
-| Loki records accepted | 11 records (10 original synthetic events + 1 HR-correlated ghost-account finding) |
+| Loki records accepted per full batch | 11 records (10 source events + 1 HR-correlated finding) |
 | Detection queries | 3 successfully tested |
 | Grafana monitoring | 3 working investigation panels |
-| Automated password-spray alert | Entered Firing / Alerting state |
+| Automated alert coverage | 3 Grafana-managed rules; password spray previously validated and the newer ghost-account/admin-change rules verified firing and recovery |
 
 ### Security Detection Dashboard
 
@@ -109,9 +110,9 @@ I developed a three-panel Grafana dashboard to provide visibility into authentic
 
 ![Identity Threat Detection Dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
 
-**Key Outcome:** The system identified six distinct accounts targeted by a simulated password spray, distinguished the suspicious pattern from isolated normal authentication failure, and automatically triggered a Grafana alert.
+**Key Outcome:** Loki detected six distinct usernames targeted over 150 seconds from one simulated source IP, distinguished isolated normal failures, and returned the expected results for the identity and privilege-change scenarios. All three scenarios have automated Grafana rules.
 
-The terminated-account and privilege-change detections were originally manual LogQL hunts. Both have since been upgraded to Grafana-managed automated alert rules, while the saved queries remain available for investigations. All three detection scenarios now have automated Grafana alerts. Controlled lab testing verified the post-termination and unauthorized administrator alerts entering Alerting and returning to Normal.
+The terminated-account and privilege-change detections began as manual LogQL hunts and were later configured as automated rules. Controlled synthetic events verified that both new rules entered Alerting and returned to Normal. The saved queries remain useful for manual investigations.
 
 ## 5. Security Investigation — The Ghost Account
 
@@ -125,7 +126,7 @@ This established the expected access-control baseline: a terminated identity sho
 
 ### Stage 2 — Simulated Password Spraying
 
-A controlled simulation generated failed authentication attempts against six different user accounts from the source IP:
+A controlled simulation generated failed authentication attempts against six different user accounts, spaced 30 seconds apart over 150 seconds, from the documentation-only source IP:
 
 `203.0.113.25`
 
@@ -135,7 +136,7 @@ This created both a suspicious authentication pattern and a normal-activity comp
 
 ### Stage 3 — Suspicious Terminated-Account Authentication
 
-A synthetic authentication event recorded a successful login for billy.kaplan without an employment-status field. Python independently correlated the login with data/terminated_users.csv, confirmed that the login occurred after termination, and generated a ghost_account_finding ingested into Loki.
+A synthetic authentication event recorded a successful login for `billy.kaplan` **without** an employment-status field. Python separately read `data/terminated_users.csv`, matched the username, compared login and termination dates, and generated a `ghost_account_finding` that was ingested into Loki. The CSV is a lab fixture, not a live OrangeHRM feed.
 
 This represented a hypothetical access-control failure requiring security investigation.
 
@@ -151,7 +152,7 @@ The synthetic security events were ingested into Loki and investigated using Log
 
 Grafana returned matching records for all three suspicious behaviors.
 
-The password-spray alert automatically entered the Alerting/Firing state when the distinct-account threshold was exceeded.
+Grafana alerts were configured for all three scenarios. The password-spray alert was previously validated; controlled test events also caused the post-termination and administrator-change rules to enter Alerting/Firing and then return to Normal.
 
 **Investigation scope:** The suspicious authentication and privilege-change events were simulated. They were not actual actions performed against Billy's inactive Authentik account.
 
@@ -206,9 +207,10 @@ The tests executed LogQL against Loki using historical evaluation timestamps, de
 - [Realistic Spray Detection Validation](evidence/screenshots/07-realistic-spray-validation.png)
 - [Five-Minute Boundary Test](evidence/screenshots/08-spray-window-boundary-test.png)
 
-**Scope:** These tests validate Loki query results and window boundaries, not Grafana alert firing or production false-positive rates.
+**Scope:** These tests validate Loki query results and window boundaries. Alert execution is documented separately in Section 7; production false-positive rates have not been measured.
 
 ---
+
 ### Detection 2 — HR-Correlated Ghost Account Detection
 
 **Objective:** Identify successful authentication events associated with terminated employees by correlating two separate data sources.
@@ -237,7 +239,7 @@ The correlation logic:
 
 - 1 HR-correlated ghost-account finding generated for `billy.kaplan`.
 - 3 correlation tests passed, including two negative scenarios.
-- 11 synthetic events and findings accepted by Loki (HTTP 204).
+- 10 synthetic source events plus 1 derived finding accepted by Loki in a full batch (HTTP 204).
 - 1 matching ghost-account finding retrieved in Grafana Explore.
 
 **Security Significance:** Demonstrates cross-source identity correlation without embedding HR employment status in the original authentication event.
@@ -256,46 +258,53 @@ The correlation logic:
 | approved="no"
 ```
 
-**Observed Result:** One synthetic unapproved administrator-group membership addition associated with `billy.kaplan`.
+**Observed Result:** One synthetic administrator-group membership addition associated with `billy.kaplan`, marked `approved="no"`. The derived five-minute alert rule was subsequently tested with a single controlled event.
 
-Production implementations would require approval verification through authoritative access-request or change-management records.
+The `approved="no"` value was supplied by the synthetic event generator; production detection would require verification against authoritative access-request or change-management records.
 
 ## 7. Automated Alerting and Validation
 
-I configured a Grafana-managed password-spray alert to evaluate authentication activity automatically.
+I configured **three Grafana-managed alert rules** in **Detection Lab → Ghost Account Detection Rules**, with a one-minute evaluation interval. Saved LogQL queries also remain available for manual investigation.
 
-### Alert Configuration
+### Alert Configuration and Observed Outcomes
 
-| Parameter | Configuration |
-|---|---|
-| Alert Name | Ghost Account - Password Spray Detection |
-| Data Source | Grafana Loki |
-| Evaluation Interval | 1 minute |
-| Detection Window | 5 minutes |
-| Threshold | More than 4 distinct accounts |
-| Pending Period | 0 seconds |
-| Recorded State | Alerting / Firing |
+| Automated rule | Trigger | Lab outcome |
+|---|---|---|
+| Ghost Account - Password Spray Detection | More than four distinct usernames failing from one source IP within five minutes | Previously observed in Alerting/Firing with six simulated accounts |
+| Ghost Account - Post-Termination Login | One or more `ghost_account_finding` records in five minutes | Entered Alerting with one finding and returned to Normal after the window expired |
+| Ghost Account - Unauthorized Admin Change | One or more simulated unapproved Administrators additions in five minutes | Entered Alerting with one event and returned to Normal after the window expired |
 
-### Verified Alert Execution
+The post-termination and administrator-change rules used a **0-second pending period** and a **one-minute evaluation interval**. They were tested with separate, narrowly scoped synthetic event submissions rather than replaying the full 11-record scenario. Their contact point, **Detection Lab - No Notifications**, had no notification integrations. External notification delivery was not tested.
 
-```text
-Alert: Ghost Account - Password Spray Detection
+### Numeric Alert Queries
 
-Source IP: 203.0.113.25
-Distinct Accounts: 6
-Threshold: > 4
+The two additional rules use numeric LogQL expressions so Grafana can evaluate alert thresholds. Example — HR-correlated ghost-account finding:
 
-Query Value: A=6.000000
-Condition Result: C=1.000000
-
-State: Alerting
+```logql
+sum(
+  count_over_time(
+    {job="identity_detection_lab", scenario="billy_kaplan"}
+    | json
+    | event_type="ghost_account_finding"
+    [5m]
+  )
+) or on() vector(0)
 ```
 
-Grafana recorded that the detection condition was satisfied.
+The administrator-change rule uses the same aggregation pattern but filters for `event_type="group_membership_added"`, `target_group="Administrators"`, and `approved="no"`. Both rules fire when the query value is **above 0**.
 
-Subsequent state-history entries also reflected transitions to normal states as the query's matching activity aged outside the evaluation window or the alert configuration was updated.
+### Verified Alert Evidence
 
-**Validation Result:** The alert rule successfully identified the simulated password-spraying pattern during automatic evaluation.
+| Evidence | Screenshot |
+|---|---|
+| Password-spray alert history (original test) | [View](evidence/screenshots/10-billy-alert-history.png) |
+| All three alert rules configured | [View](evidence/screenshots/12-three-automated-alerts.png) |
+| Ghost-account alert in Firing state | [View](evidence/screenshots/10-ghost-account-alert-firing.png) |
+| Ghost-account alert history: Alerting → Normal | [View](evidence/screenshots/11-ghost-account-alert-history.png) |
+| Unauthorized administrator alert in Firing state | [View](evidence/screenshots/13-admin-change-alert-firing.png) |
+| Unauthorized administrator alert history: Alerting → Normal | [View](evidence/screenshots/14-admin-change-alert-history.png) |
+
+**Validation boundary:** These observations establish alert evaluation and state changes in the Grafana lab. They do not establish production false-positive performance, actual privilege changes in Authentik, or successful external notification delivery.
 
 ## 8. Technical Challenges and Lessons Learned
 
@@ -347,9 +356,21 @@ The simulated security events demonstrated how a defender might investigate acti
 
 ### Security Event Generation and Detection
 
-**Python validation — Four passing checks**
+**Original local validation baseline (historical screenshot)**
 
-![Python Detection Validation](evidence/screenshots/03-python-local-tests.png)
+![Original Python Detection Validation](evidence/screenshots/03-python-local-tests.png)
+
+**Updated local validation — Five passing checks**
+
+![Updated Python Detection Validation](evidence/screenshots/05-local-validation.png)
+
+**Live Loki API validation — Four passing checks**
+
+![Live Loki API Validation](evidence/screenshots/06-loki-api-validation.png)
+
+**Rolling five-minute window test — Six included, then four**
+
+![Spray Window Boundary Validation](evidence/screenshots/08-spray-window-boundary-test.png)
 
 **Synthetic events collected in Loki**
 
@@ -359,17 +380,30 @@ The simulated security events demonstrated how a defender might investigate acti
 
 ![Grafana Detection Dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
 
-**Automated alert state history**
+**Original password-spray alert history**
 
-![Grafana Alert State History](evidence/screenshots/10-billy-alert-history.png)
+![Password Spray Alert State History](evidence/screenshots/10-billy-alert-history.png)
+
+**All three automated alert rules**
+
+![Three Automated Grafana Alerts](evidence/screenshots/12-three-automated-alerts.png)
+
+**Post-termination alert history**
+
+![Ghost Account Alert History](evidence/screenshots/11-ghost-account-alert-history.png)
+
+**Unauthorized administrator alert history**
+
+![Admin Change Alert History](evidence/screenshots/14-admin-change-alert-history.png)
 
 ## 10. Reproducing the Detection Simulation
 
 ### Requirements
 
 - Python 3
-- Authorized Grafana Loki environment
-- Grafana configured to query the Loki data source
+- Authorized Grafana Loki environment with working HTTP ingestion/query endpoints
+- Grafana configured with the Loki data source
+- Synthetic HR reference data in `data/terminated_users.csv` (the lab fixture, not a live HR integration)
 
 ### Generate Synthetic Events
 
@@ -377,11 +411,14 @@ The simulated security events demonstrated how a defender might investigate acti
 py scripts/send_simulated_events.py --dry-run
 ```
 
-### Validate Detection Conditions
+### Validate Detection Conditions Locally
 
 ```powershell
+py scripts/correlate_identity_events.py
 py scripts/validate_detection.py
 ```
+
+These checks exercise the Python correlation and detection logic; they do **not** query Loki.
 
 ### Configure a Loki Ingestion Endpoint
 
@@ -395,6 +432,17 @@ $env:LOKI_PUSH_URL = "http://YOUR-LOKI-HOST:PORT/loki/api/v1/push"
 py scripts/send_simulated_events.py --send
 ```
 
+### Query Loki and Validate the Rolling Window
+
+After ingestion, and with `LOKI_PUSH_URL` still configured in the terminal:
+
+```powershell
+py scripts/validate_loki.py
+py scripts/validate_spray_window.py
+```
+
+These scripts query the Loki HTTP API. The scenario must have been ingested recently enough for the live validation script's lookback window; the boundary test uses recorded event timestamps.
+
 ### Investigate Security Events
 
 In Grafana Explore, run:
@@ -403,59 +451,46 @@ In Grafana Explore, run:
 {job="identity_detection_lab", scenario="billy_kaplan"} | json
 ```
 
-The `queries/` directory contains the saved detection queries and a proposed administrator-change alert query.
+The `queries/` directory contains saved LogQL investigation queries and an administrator-change alert-query draft. Three Grafana-managed alert rules were also configured interactively and tested in the lab.
 
-Only the password-spray alert was configured and validated as an automated Grafana alert.
+### Controlled Alert-Test Scripts
+
+Run dry-run previews before any test submission:
+
+```powershell
+py scripts/send_ghost_alert_test.py --dry-run
+py scripts/send_admin_alert_test.py --dry-run
+```
+
+The `--send` option requires an explicitly configured instructor-authorized Loki push endpoint and submits synthetic events. The controlled tests were used to verify Grafana alert firing/recovery. These scripts do **not** perform authentication or change account permissions.
 
 ## 11. Future Improvements
 
-Potential improvements include:
+**Production-tuning considerations (not implemented or measured in this lab):** A source IP can represent many legitimate users behind a corporate VPN, NAT gateway, proxy, or load balancer. Five distinct login failures over five minutes is a useful lab threshold, **not a validated production threshold**. In production, I would baseline normal per-IP and per-user failure patterns, tune by source category and expected login volume, correlate device/user/session context, and investigate exceptions before suppressing alerts. Similar care is needed to validate real HR termination feeds and change approvals.
+
+Further improvements include:
 
 - Correlating authoritative HR lifecycle events with live identity-provider authentication data.
-- Implementing additional automated alerts for terminated-account access and unauthorized privilege changes.
+- Exporting or provisioning all three Grafana alert rules as version-controlled configuration to improve reproducibility.
 - Developing Sigma rules for portable security detection logic.
-- Enriching authentication events with additional user, device, and source context.
+- Baseline-tuning password-spray thresholds by source category (corporate VPN, NAT egress, proxy, and service accounts), considering allowlisting only well-understood benign sources and retaining monitoring for misuse.
 - Introducing alert severity classifications and incident response playbooks.
-- Expanding validation coverage to include duplicate events, false positives, ingestion failures, and additional attack scenarios.
+- Expanding validation coverage to include duplicate events, benign shared-IP login bursts, service-account failures, ingestion gaps, and realistic false-positive tests.
 
 ## 12. Security and Testing Scope
 
-This project used controlled synthetic security events and documentation-only IP addresses.
+This project used controlled synthetic security events and documentation-only IP addresses. The initial full batch comprised 10 generated source events plus 1 derived ghost-account finding; later focused submissions tested individual alerts.
 
 Billy Kaplan's termination and inactive Authentik status were independently verified as identity lifecycle context. The suspicious login, password-spray activity, and privileged-group change were simulated using Python.
 
-No actual unauthorized login, account compromise, privilege escalation, or real password-spray attack was performed.
+No actual unauthorized login, account compromise, privilege escalation, or real password-spray attack was performed. The separate HR CSV was a lab reference file, not a live OrangeHRM export or automated provider connection.
 
-Sensitive credentials and private infrastructure details are excluded from the repository.
+Credentials and private infrastructure details are not required to reproduce the code. Alert state testing occurred in a controlled Grafana/Loki lab; external notification delivery was not tested.
 
----
+## 13. Project Outcome
 
-### Automated Alert Coverage - Verified
+**Built and validated a controlled identity-threat detection workflow using Python, separate HR reference data, Grafana Loki, LogQL, and Grafana.**
 
-Three Grafana-managed alert rules were configured and evaluated in the Detection Lab.
+The implementation demonstrates hands-on experience in security event generation, cross-source HR/authentication correlation, centralized log ingestion, LogQL detection engineering, security investigations, three Grafana-managed alert rules, troubleshooting, and layered validation.
 
-| Automated Detection | Verified Result | Evidence |
-|---|---|---|
-| Password Spray Detection | Previously validated automated alert | [Alert history](evidence/screenshots/10-billy-alert-history.png) |
-| Post-Termination Login | Entered Alerting and returned to Normal after the five-minute window | [Firing](evidence/screenshots/10-ghost-account-alert-firing.png) / [History](evidence/screenshots/11-ghost-account-alert-history.png) |
-| Unauthorized Admin Change | Entered Alerting and returned to Normal after the five-minute window | [Firing](evidence/screenshots/13-admin-change-alert-firing.png) / [History](evidence/screenshots/14-admin-change-alert-history.png) |
-
-[View all three configured alert rules](evidence/screenshots/12-three-automated-alerts.png)
-
-**Implementation:** All three rules use numeric LogQL queries evaluated by Grafana. The post-termination and administrator-change rules were tested with controlled synthetic events and a contact point containing no notification integrations.
-
-**Scope:** Alert firing and recovery were verified in the lab. External notification delivery and live production identity-provider integrations were not tested.
-
-## Project Outcome
-
-**Built and validated an end-to-end identity threat detection pipeline using Python, Grafana Loki, LogQL, and Grafana.**
-
-The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
-
-By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
-
-
-
-
-
-
+The lab demonstrates how identity lifecycle context can strengthen event-based detections while keeping simulated activity, manually verified identity context, and production integration boundaries explicit.
