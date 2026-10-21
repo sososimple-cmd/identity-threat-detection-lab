@@ -111,7 +111,7 @@ I developed a three-panel Grafana dashboard to provide visibility into authentic
 
 **Key Outcome:** The system identified six distinct accounts targeted by a simulated password spray, distinguished the suspicious pattern from isolated normal authentication failure, and automatically triggered a Grafana alert.
 
-The terminated-account and privilege-change patterns were validated through LogQL investigation queries. Only the password-spray detection was configured and tested as an automatic alert.
+The terminated-account and privilege-change detections were originally manual LogQL hunts. Both have since been upgraded to Grafana-managed automated alert rules, while the saved queries remain available for investigations. All three detection scenarios now have automated Grafana alerts. Controlled lab testing verified the post-termination and unauthorized administrator alerts entering Alerting and returning to Normal.
 
 ## 5. Security Investigation — The Ghost Account
 
@@ -135,7 +135,7 @@ This created both a suspicious authentication pattern and a normal-activity comp
 
 ### Stage 3 — Suspicious Terminated-Account Authentication
 
-A synthetic security event recorded a successful login attributed to `billy.kaplan` while the event's employment status was marked as terminated.
+A synthetic authentication event recorded a successful login for billy.kaplan without an employment-status field. Python independently correlated the login with data/terminated_users.csv, confirmed that the login occurred after termination, and generated a ghost_account_finding ingested into Loki.
 
 This represented a hypothetical access-control failure requiring security investigation.
 
@@ -453,6 +453,7 @@ Three Grafana-managed alert rules were configured and evaluated in the Detection
 The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
 
 By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
+
 
 
 
