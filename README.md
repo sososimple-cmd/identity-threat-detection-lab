@@ -26,7 +26,7 @@ Security teams need to detect three particularly concerning behaviors:
 
 ## 2. The Solution — An Identity Threat Detection Pipeline
 
-I developed an end-to-end identity threat detection pipeline using Python, Grafana Loki, LogQL, and Grafana.
+I developed an identity threat detection workflow using Python, separate HR termination reference data, Grafana Loki, LogQL, and Grafana. The lab includes one automated password-spray alert and two manually executed investigation detections.
 
 The solution delivers:
 
@@ -43,7 +43,7 @@ The implementation combines IAM lifecycle context with security monitoring to de
 | Phase | Engineering Work |
 |---|---|
 | Identity Verification | Verified Billy Kaplan's termination record in OrangeHRM and inactive identity in Authentik |
-| Event Generation | Developed Python scripts generating 10 synthetic authentication and access-change events |
+| Event Generation | Generated 10 synthetic authentication and access-change events, then correlated independent HR termination data to produce 1 additional security finding (11 records total) |
 | Log Ingestion | Submitted structured JSON events through Loki's HTTP ingestion API |
 | Detection Logic | Developed LogQL queries targeting three identity threat patterns |
 | Security Monitoring | Created a three-panel Grafana investigation dashboard |
@@ -53,13 +53,39 @@ The implementation combines IAM lifecycle context with security monitoring to de
 
 ### Security Detection Pipeline Architecture
 
-![Security Detection Pipeline](evidence/screenshots/security-detection-pipeline.png)
+```mermaid
+flowchart TB
+    subgraph CONTEXT["Manual Verification - Not Integrated"]
+        ORANGE["OrangeHRM: Termination Verified"]
+        AUTH["Authentik: Inactive Account Verified"]
+    end
 
-**Architecture notes:** The dashed connections represent verified HR and identity context, not automated integrations. The Python generator creates synthetic security events independently of OrangeHRM and Authentik. Solid connections represent the implemented event submission, querying, and monitoring workflow.
+    subgraph LAB["Implemented Detection Lab"]
+        HR["HR Termination CSV"]
+        GEN["Python Generator: 10 Synthetic Events"]
+        CORR["Python HR and Authentication Correlation"]
+        FIND["Ghost Account Finding: 1 Record"]
+        LOKI["Grafana Loki: 11 Total Records"]
+        HUNTS["LogQL: Ghost Account and Admin Hunts"]
+        ALERT["Automated Password Spray Alert"]
+        DASH["Grafana: 3 Investigation Panels"]
+
+        HR --> CORR
+        GEN --> CORR
+        CORR --> FIND
+        GEN --> LOKI
+        FIND --> LOKI
+        LOKI --> HUNTS
+        LOKI --> ALERT
+        LOKI --> DASH
+    end
+```
+
+**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. The lab generates 10 source events and 1 derived ghost-account finding, sends 11 records to Loki, and uses Grafana for investigations and password-spray alerting. Only the password-spray alert is automated.
 
 ## 4. Results — What the Solution Detected
 
-The detection pipeline successfully identified the simulated suspicious activity, retrieved security events through Grafana, and triggered an automated password-spray alert.
+The lab detected simulated suspicious activity, ingested 11 records into Loki, retrieved an HR-correlated ghost-account finding through Grafana, and demonstrated an automated password-spray alert. Ghost-account and administrator-change investigations remain manual queries.
 
 | Detection / Validation | Verified Result |
 |---|---|
@@ -67,9 +93,9 @@ The detection pipeline successfully identified the simulated suspicious activity
 | Normal failed authentication | 1 account from a separate IP, below the threshold |
 | Terminated-account authentication | 1 matching synthetic successful-login event |
 | Unauthorized privilege escalation | 1 matching synthetic administrator-group addition |
-| Python validation | 4 of 4 local checks passed |
+| Python validation | 5 of 5 local Python validation checks passed |
 | Loki ingestion | HTTP 204 |
-| Security events retrieved | 10 synthetic events |
+| Loki records accepted | 11 records (10 original synthetic events + 1 HR-correlated ghost-account finding) |
 | Detection queries | 3 successfully tested |
 | Grafana monitoring | 3 working investigation panels |
 | Automated password-spray alert | Entered Firing / Alerting state |
@@ -384,3 +410,5 @@ Sensitive credentials and private infrastructure details are excluded from the r
 The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
 
 By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
+
+
