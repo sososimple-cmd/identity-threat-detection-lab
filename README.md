@@ -94,6 +94,9 @@ The lab detected simulated suspicious activity, ingested 11 records into Loki, r
 | Terminated-account authentication | 1 matching synthetic successful-login event |
 | Unauthorized privilege escalation | 1 matching synthetic administrator-group addition |
 | Python validation | 5 of 5 local Python validation checks passed |
+| Live Loki API validation | 4 of 4 checks passed using scripts/validate_loki.py |
+| Loki API results | 6 password-spray accounts, 1 HR-correlated ghost-account finding, 1 unauthorized admin change, and normal activity below threshold |
+| Loki API evidence | [View screenshot](evidence/screenshots/06-loki-api-validation.png) |
 | Loki ingestion | HTTP 204 |
 | Loki records accepted | 11 records (10 original synthetic events + 1 HR-correlated ghost-account finding) |
 | Detection queries | 3 successfully tested |
@@ -410,5 +413,6 @@ Sensitive credentials and private infrastructure details are excluded from the r
 The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
 
 By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
+
 
 
