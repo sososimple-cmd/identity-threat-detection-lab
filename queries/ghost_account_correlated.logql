@@ -1,0 +1,4 @@
+
+{job="identity_detection_lab", scenario="billy_kaplan"}
+| json
+| event_type="ghost_account_finding"
