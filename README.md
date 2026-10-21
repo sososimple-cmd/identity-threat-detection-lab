@@ -132,6 +132,8 @@ A controlled simulation generated failed authentication attempts against six dif
 
 The dataset also included one ordinary failed-login event from another source IP.
 
+Billy Kaplan later had a simulated successful login from the same source IP, `203.0.113.25`. Billy was not one of the six targeted password-spray accounts. The shared IP connects the simulated investigation scenarios but does not establish that the same real-world actor performed both activities.
+
 This created both a suspicious authentication pattern and a normal-activity comparison for validation.
 
 ### Stage 3 — Suspicious Terminated-Account Authentication
@@ -241,6 +243,12 @@ The correlation logic:
 - 3 correlation tests passed, including two negative scenarios.
 - 10 synthetic source events plus 1 derived finding accepted by Loki in a full batch (HTTP 204).
 - 1 matching ghost-account finding retrieved in Grafana Explore.
+
+**HR Correlation Evidence:**
+
+- [Python HR Correlation Results](evidence/screenshots/02-ghost-correlation-results.png)
+- [Correlation Dry-Run Evidence](evidence/screenshots/03-correlation-dry-run.png)
+- [Verified Ghost-Account Finding in Grafana](evidence/screenshots/04-ghost-finding-grafana.png)
 
 **Security Significance:** Demonstrates cross-source identity correlation without embedding HR employment status in the original authentication event.
 
@@ -451,7 +459,7 @@ In Grafana Explore, run:
 {job="identity_detection_lab", scenario="billy_kaplan"} | json
 ```
 
-The `queries/` directory contains saved LogQL investigation queries and an administrator-change alert-query draft. Three Grafana-managed alert rules were also configured interactively and tested in the lab.
+The `queries/` directory contains saved investigation queries and the numeric alert expressions in `queries/05-admin-addition-alert.logql` and `queries/06-ghost-account-alert.logql`. All three Grafana-managed alert rules were configured and tested interactively. The saved files contain query expressions, not complete provisioned alert definitions.
 
 ### Controlled Alert-Test Scripts
 
