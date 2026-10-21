@@ -26,7 +26,7 @@ Security teams need to detect three particularly concerning behaviors:
 
 ## 2. The Solution — An Identity Threat Detection Pipeline
 
-I developed an identity threat detection workflow using Python, separate HR termination reference data, Grafana Loki, LogQL, and Grafana. The lab includes one automated password-spray alert and two manually executed investigation detections.
+I developed an identity threat detection workflow using Python, separate HR termination reference data, Grafana Loki, LogQL, and Grafana. The lab includes three Grafana-managed automated alert rules, alongside saved manual investigation queries.
 
 The solution delivers:
 
@@ -66,8 +66,8 @@ flowchart TB
         CORR["Python HR and Authentication Correlation"]
         FIND["Ghost Account Finding: 1 Record"]
         LOKI["Grafana Loki: 11 Total Records"]
-        HUNTS["LogQL: Ghost Account and Admin Hunts"]
-        ALERT["Automated Password Spray Alert"]
+        HUNTS["LogQL: Three Investigation Queries"]
+        ALERT["Grafana: Three Automated Alerts"]
         DASH["Grafana: 3 Investigation Panels"]
 
         HR --> CORR
@@ -81,11 +81,11 @@ flowchart TB
     end
 ```
 
-**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. The lab generates 10 source events and 1 derived ghost-account finding, sends 11 records to Loki, and uses Grafana for investigations and password-spray alerting. Only the password-spray alert is automated.
+**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. The lab generates 10 source events and 1 derived ghost-account finding, sends 11 records to Loki, and uses Grafana for investigations and three automated detection alerts. All three lab detection scenarios now have automated Grafana alert rules.
 
 ## 4. Results — What the Solution Detected
 
-The lab detected simulated suspicious activity, ingested 11 records into Loki, retrieved an HR-correlated ghost-account finding through Grafana, and demonstrated an automated password-spray alert. Ghost-account and administrator-change investigations remain manual queries.
+The lab detected simulated suspicious activity, ingested 11 records into Loki, retrieved an HR-correlated ghost-account finding through Grafana, and demonstrated an automated password-spray alert. All three detection scenarios now have automated alerts, while saved LogQL queries remain available for manual investigation.
 
 | Detection / Validation | Verified Result |
 |---|---|
@@ -430,6 +430,22 @@ Sensitive credentials and private infrastructure details are excluded from the r
 
 ---
 
+### Automated Alert Coverage - Verified
+
+Three Grafana-managed alert rules were configured and evaluated in the Detection Lab.
+
+| Automated Detection | Verified Result | Evidence |
+|---|---|---|
+| Password Spray Detection | Previously validated automated alert | [Alert history](evidence/screenshots/10-billy-alert-history.png) |
+| Post-Termination Login | Entered Alerting and returned to Normal after the five-minute window | [Firing](evidence/screenshots/10-ghost-account-alert-firing.png) / [History](evidence/screenshots/11-ghost-account-alert-history.png) |
+| Unauthorized Admin Change | Entered Alerting and returned to Normal after the five-minute window | [Firing](evidence/screenshots/13-admin-change-alert-firing.png) / [History](evidence/screenshots/14-admin-change-alert-history.png) |
+
+[View all three configured alert rules](evidence/screenshots/12-three-automated-alerts.png)
+
+**Implementation:** All three rules use numeric LogQL queries evaluated by Grafana. The post-termination and administrator-change rules were tested with controlled synthetic events and a contact point containing no notification integrations.
+
+**Scope:** Alert firing and recovery were verified in the lab. External notification delivery and live production identity-provider integrations were not tested.
+
 ## Project Outcome
 
 **Built and validated an end-to-end identity threat detection pipeline using Python, Grafana Loki, LogQL, and Grafana.**
@@ -437,6 +453,7 @@ Sensitive credentials and private infrastructure details are excluded from the r
 The implementation demonstrates hands-on experience in security event generation, centralized log ingestion, detection logic development, security investigations, Grafana dashboard configuration, automated alerting, troubleshooting, and validation.
 
 By connecting IAM lifecycle context with security event analysis, the project demonstrates a practical approach to detecting identity-related threats and improving security monitoring visibility.
+
 
 
 
