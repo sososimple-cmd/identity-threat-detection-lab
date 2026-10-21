@@ -468,6 +468,40 @@ The `--send` option requires an explicitly configured instructor-authorized Loki
 
 **Production-tuning considerations (not implemented or measured in this lab):** A source IP can represent many legitimate users behind a corporate VPN, NAT gateway, proxy, or load balancer. Five distinct login failures over five minutes is a useful lab threshold, **not a validated production threshold**. In production, I would baseline normal per-IP and per-user failure patterns, tune by source category and expected login volume, correlate device/user/session context, and investigate exceptions before suppressing alerts. Similar care is needed to validate real HR termination feeds and change approvals.
 
+### False-Positive Analysis - Synthetic Shared-IP Testing
+
+**Objective:** Evaluate how legitimate authentication failures could trigger the password-spray detection rule.
+
+**Problem:** A corporate VPN, NAT gateway, or proxy can place multiple legitimate users behind the same public IP address. A rule based only on distinct failed usernames per source IP may mistake this activity for password spraying.
+
+**Test Implementation:** Created `scripts/assess_false_positives.py` to evaluate four synthetic authentication scenarios using a local model of the detection threshold.
+
+| Test Scenario | Distinct Accounts | Alert Triggered | Result |
+|---|---|---|---|
+| Simulated password spray | 6 | Yes | PASS - Expected detection |
+| Assumed-benign shared VPN activity | 6 | Yes | PASS - Illustrative false positive |
+| Repeated service-account failures | 1 | No | PASS - Below threshold |
+| Isolated normal authentication failure | 1 | No | PASS - Below threshold |
+
+**Validation:** All four expected scenario outcomes passed.
+
+**Key Finding:** The simulated attack and assumed-benign shared-VPN activity both triggered the same threshold. This demonstrates a false-positive risk when source IP and distinct-account count are the only detection signals.
+
+**Production Tuning Strategy:**
+
+1. **Establish baselines:** Measure normal authentication failures by source IP, account, time of day, and network category.
+2. **Classify shared infrastructure:** Identify corporate VPN egress addresses, NAT gateways, and trusted proxies.
+3. **Enrich authentication data:** Incorporate device identity, authentication outcome, user context, and session information.
+4. **Tune detection thresholds:** Adjust thresholds using observed normal activity and known attack patterns instead of relying on a universal value.
+5. **Manage exceptions carefully:** Investigate recurring benign sources before implementing narrowly scoped exceptions. Avoid automatically suppressing all activity from corporate VPN addresses.
+6. **Validate continuously:** Measure false-positive rates, missed detections, and alert volume before deploying changes to production.
+
+**Evidence:** [False-Positive Analysis Results](evidence/screenshots/15-false-positive-analysis.png)
+
+**Script:** `scripts/assess_false_positives.py`
+
+**Testing Scope:** This was a local synthetic rule-model test. It did not query Loki, change the existing Grafana alert rules, implement suppression logic, or measure production false-positive rates.
+
 Further improvements include:
 
 - Correlating authoritative HR lifecycle events with live identity-provider authentication data.
