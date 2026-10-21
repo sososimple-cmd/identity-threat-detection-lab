@@ -246,6 +246,7 @@ The correlation logic:
 
 **HR Correlation Evidence:**
 
+- [HR Termination Source Data](evidence/screenshots/01-hr-termination-source.png)
 - [Python HR Correlation Results](evidence/screenshots/02-ghost-correlation-results.png)
 - [Correlation Dry-Run Evidence](evidence/screenshots/03-correlation-dry-run.png)
 - [Verified Ghost-Account Finding in Grafana](evidence/screenshots/04-ghost-finding-grafana.png)
@@ -472,11 +473,11 @@ py scripts/send_admin_alert_test.py --dry-run
 
 The `--send` option requires an explicitly configured instructor-authorized Loki push endpoint and submits synthetic events. The controlled tests were used to verify Grafana alert firing/recovery. These scripts do **not** perform authentication or change account permissions.
 
-## 11. Future Improvements
+## 11. False-Positive Analysis - Synthetic Shared-IP Testing
 
 **Production-tuning considerations (not implemented or measured in this lab):** A source IP can represent many legitimate users behind a corporate VPN, NAT gateway, proxy, or load balancer. Five distinct login failures over five minutes is a useful lab threshold, **not a validated production threshold**. In production, I would baseline normal per-IP and per-user failure patterns, tune by source category and expected login volume, correlate device/user/session context, and investigate exceptions before suppressing alerts. Similar care is needed to validate real HR termination feeds and change approvals.
 
-### False-Positive Analysis - Synthetic Shared-IP Testing
+
 
 **Objective:** Evaluate how legitimate authentication failures could trigger the password-spray detection rule.
 
@@ -510,6 +511,8 @@ The `--send` option requires an explicitly configured instructor-authorized Loki
 
 **Testing Scope:** This was a local synthetic rule-model test. It did not query Loki, change the existing Grafana alert rules, implement suppression logic, or measure production false-positive rates.
 
+## 12. Future Improvements
+
 Further improvements include:
 
 - Correlating authoritative HR lifecycle events with live identity-provider authentication data.
@@ -519,7 +522,7 @@ Further improvements include:
 - Introducing alert severity classifications and incident response playbooks.
 - Expanding validation coverage to include duplicate events, benign shared-IP login bursts, service-account failures, ingestion gaps, and realistic false-positive tests.
 
-## 12. Security and Testing Scope
+## 13. Security and Testing Scope
 
 This project used controlled synthetic security events and documentation-only IP addresses. The initial full batch comprised 10 generated source events plus 1 derived ghost-account finding; later focused submissions tested individual alerts.
 
@@ -529,7 +532,7 @@ No actual unauthorized login, account compromise, privilege escalation, or real 
 
 Credentials and private infrastructure details are not required to reproduce the code. Alert state testing occurred in a controlled Grafana/Loki lab; external notification delivery was not tested.
 
-## 13. Project Outcome
+## 14. Project Outcome
 
 **Built and validated a controlled identity-threat detection workflow using Python, separate HR reference data, Grafana Loki, LogQL, and Grafana.**
 
