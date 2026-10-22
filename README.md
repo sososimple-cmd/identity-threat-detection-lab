@@ -62,19 +62,32 @@ flowchart TB
 
     subgraph LAB["Implemented Detection Lab"]
         HR["HR Termination CSV"]
+        APPROVAL["Admin Change Approval CSV"]
         GEN["Python Generator: 10 Synthetic Source Events"]
-        CORR["Python HR and Authentication Correlation"]
-        FIND["Ghost Account Finding: 1 Record"]
+
+        GHOSTCORR["Python HR and Authentication Correlation"]
+        ADMINCORR["Python Admin and Approval Correlation"]
+
+        GHOSTFIND["Ghost Account Finding: 1 Record"]
+        ADMINFIND["Approval-Correlated Admin Finding: 1 Record"]
+
         LOKI["Grafana Loki: 12 Records per Full Batch"]
         HUNTS["LogQL: Three Investigation Queries"]
         ALERT["Grafana: Three Automated Alerts"]
         DASH["Grafana: 3 Investigation Panels"]
 
-        HR --> CORR
-        GEN --> CORR
-        CORR --> FIND
+        HR --> GHOSTCORR
+        GEN --> GHOSTCORR
+        GHOSTCORR --> GHOSTFIND
+
+        APPROVAL --> ADMINCORR
+        GEN --> ADMINCORR
+        ADMINCORR --> ADMINFIND
+
         GEN --> LOKI
-        FIND --> LOKI
+        GHOSTFIND --> LOKI
+        ADMINFIND --> LOKI
+
         LOKI --> HUNTS
         LOKI --> ALERT
         LOKI --> DASH
