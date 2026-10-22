@@ -228,23 +228,28 @@ def main():
         f"{len(ghost_results)} finding(s) (expected 1)"
     )
 
-    # TEST 3: Query unauthorized administrator changes.
+    # TEST 3: Execute the saved approval-correlated admin LogQL.
+    # The admin finding occurs 5 seconds after the ghost finding.
+    # Evaluate after both events exist.
     admin_logql = (
-        SELECTOR
-        + ' | json'
-        + ' | event_type="group_membership_added"'
-        + ' | target_group="Administrators"'
-        + ' | approved="no"'
+        PROJECT / "queries" / "05-admin-addition-alert.logql"
+    ).read_text(encoding="utf-8-sig").strip()
+
+    admin_evaluation_ns = anchor_ns + 10_000_000_000
+
+    admin_results = query_metric(
+        admin_logql, admin_evaluation_ns
     )
 
-    admin_results = query_logs(
-        admin_logql, window_start, window_end
+    admin_count = sum(
+        float(result["value"][1])
+        for result in admin_results
     )
 
     test3 = report(
-        "Unauthorized administrator change LogQL",
-        len(admin_results) == 1,
-        f"{len(admin_results)} event(s) (expected 1)"
+        "Approval-correlated admin change LogQL",
+        admin_count == 1,
+        f"{admin_count:g} finding(s) (expected 1)"
     )
 
     # TEST 4: Validate that a normal source IP stays

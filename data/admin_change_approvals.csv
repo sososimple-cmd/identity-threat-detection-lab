@@ -1,0 +1,5 @@
+change_id,actor,target_user,target_group,event_type,status,valid_from,valid_until
+CHG-1001,maria,maria,Administrators,group_membership_added,approved,2026-01-01T00:00:00Z,2027-12-31T23:59:59Z
+CHG-9001,billy.kaplan,billy.kaplan,Remote Desktop Users,group_membership_added,approved,2026-01-01T00:00:00Z,2027-12-31T23:59:59Z
+CHG-9002,billy.kaplan,billy.kaplan,Administrators,group_membership_added,approved,2026-01-01T00:00:00Z,2026-10-01T23:59:59Z
+CHG-9003,billy.kaplan,billy.kaplan,Administrators,group_membership_added,rejected,2026-01-01T00:00:00Z,2027-12-31T23:59:59Z

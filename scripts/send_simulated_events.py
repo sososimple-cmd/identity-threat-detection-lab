@@ -10,6 +10,7 @@ import urllib.request
 import urllib.error
 
 from correlate_identity_events import find_ghost_logins
+from correlate_privilege_changes import find_suspicious_admin_changes
 
 LABELS = {
     "job": "identity_detection_lab",
@@ -91,7 +92,7 @@ def events(now):
         username="billy.kaplan",
         target_user="billy.kaplan",
         target_group="Administrators",
-        approved="no",
+        change_id="CHG-9001",
         source_ip=IP
     )
 
@@ -122,10 +123,11 @@ def main():
 
     # Correlate authentication activity against HR records
     findings = find_ghost_logins(raw_rows)
+    admin_findings = find_suspicious_admin_changes(raw_rows)
 
     # Combine source events and derived findings
     rows = sorted(
-        raw_rows + findings,
+        raw_rows + findings + admin_findings,
         key=lambda item: item[0]
     )
 

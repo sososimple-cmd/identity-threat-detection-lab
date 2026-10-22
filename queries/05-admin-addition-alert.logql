@@ -2,9 +2,9 @@ sum(
   count_over_time(
     {job="identity_detection_lab", scenario="billy_kaplan"}
     | json
-    | event_type="group_membership_added"
+    | event_type="suspicious_admin_change_finding"
+    | event_source="approval_correlation_lab"
     | target_group="Administrators"
-    | approved="no"
     [5m]
   )
 ) or on() vector(0)

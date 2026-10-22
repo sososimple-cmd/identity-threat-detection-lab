@@ -1,0 +1,38 @@
+name: Detection Lab - Offline Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Python detection validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Check Python syntax
+        run: python -m compileall -q scripts
+
+      - name: Validate detection scenarios
+        run: python scripts/validate_detection.py
+
+      - name: Validate HR correlation
+        run: python scripts/correlate_identity_events.py
+
+      - name: Validate admin approval correlation
+        run: python scripts/correlate_privilege_changes.py
+
+      - name: Validate false-positive scenarios
+        run: python scripts/assess_false_positives.py
