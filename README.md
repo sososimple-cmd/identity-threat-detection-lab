@@ -43,7 +43,7 @@ The implementation combines IAM lifecycle context with security monitoring to de
 | Phase | Engineering Work |
 |---|---|
 | Identity Verification | Verified Billy Kaplan's termination record in OrangeHRM and inactive identity in Authentik |
-| Event Generation | Generated 10 synthetic authentication and access-change events, then correlated independent HR termination data to produce 1 additional security finding (11 records total) |
+| Event Generation | Generated 10 synthetic authentication and access-change events, then correlated independent HR termination and change-approval data to produce 2 security findings (12 records total) |
 | Log Ingestion | Submitted structured JSON events through Loki's HTTP ingestion API |
 | Detection Logic | Developed LogQL queries targeting three identity threat patterns |
 | Security Monitoring | Created a three-panel Grafana investigation dashboard |
@@ -65,7 +65,7 @@ flowchart TB
         GEN["Python Generator: 10 Synthetic Source Events"]
         CORR["Python HR and Authentication Correlation"]
         FIND["Ghost Account Finding: 1 Record"]
-        LOKI["Grafana Loki: 11 Records per Full Batch"]
+        LOKI["Grafana Loki: 12 Records per Full Batch"]
         HUNTS["LogQL: Three Investigation Queries"]
         ALERT["Grafana: Three Automated Alerts"]
         DASH["Grafana: 3 Investigation Panels"]
@@ -83,6 +83,63 @@ flowchart TB
 
 **Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. Each full simulation batch generates 10 source events and one derived ghost-account finding (11 Loki records). Separate controlled events were later sent to verify individual alert firing. All three detection scenarios have Grafana-managed alert rules; the two newer rules use a contact point with no notification integrations.
 
+### Independent Change-Approval Correlation
+
+The administrator-change detection was originally based on an `approved="no"` field embedded in the security event. That approach relied on the event itself to declare whether the action was authorized.
+
+I redesigned the detection to compare two independent data sources:
+
+1. **Group-change events:** Synthetic records describing the actor, target user, target group, event type, timestamp, and change-ticket ID.
+2. **Change-approval records:** A separate simulated ServiceNow-style CSV containing ticket details, approval status, and validity dates.
+
+The Python script `scripts/correlate_privilege_changes.py` compares these records and generates a `suspicious_admin_change_finding` when a change to the Administrators group has no valid matching approval.
+
+The correlation checks:
+
+- Change-ticket ID
+- Actor and target user
+- Requested group and event type
+- Approval status
+- Approval validity period relative to the event timestamp
+
+In the simulated scenario, Billy Kaplan's group-change event references `CHG-9001`, but that ticket authorizes a different group. The correlation therefore identifies the administrator-group addition as suspicious.
+
+The original group-change event no longer contains an `approved` field.
+
+**Important distinction:** A missing or mismatched approval indicates a change requiring investigation; it does not independently prove malicious activity.
+
+Seven local correlation checks validate approved, mismatched, expired, rejected, missing-ticket, and non-administrator scenarios, including a test proving that the old event-level approval field is not trusted.
+
+### Ingest-Time Enrichment and Production Design
+
+This lab performs **ingest-time enrichment**.
+
+The Python correlation programs join synthetic security events against separate HR termination and change-approval records **before** sending findings to Loki.
+
+The pipeline is:
+
+1. Generate simulated authentication and group-change events.
+2. Load independent HR termination and change-approval CSV files.
+3. Correlate the events with the appropriate authoritative-context records.
+4. Generate derived security findings.
+5. Ingest original events and derived findings into Loki.
+6. Query findings through LogQL and evaluate Grafana alerts.
+
+Loki does not perform the HR or approval join in this design. It stores and queries the resulting correlated findings.
+
+**Production considerations**
+
+The lab uses static, synthetic CSV files. A production implementation would require:
+
+- Authorized, regularly refreshed HRIS and ITSM approval feeds.
+- Secure service identities and read-only access to authoritative systems.
+- Timestamp-aware matching and consistent identity identifiers.
+- Monitoring for stale, missing, or failed source-data updates.
+- Handling unavailable lookup data as an investigation or data-quality condition rather than silently treating it as a valid approval.
+- Logging correlation decisions for auditability and investigating duplicate or conflicting records.
+
+These are proposed production improvements, not integrations implemented in this lab.
+
 ## 4. Results — What the Solution Detected
 
 A full simulation batch produced 10 synthetic source events and one HR-correlated finding, accepted by Loki with HTTP 204. The saved LogQL queries returned expected results through the Loki API. Three Grafana-managed rules were configured; alert firing and recovery were observed in controlled lab tests. Separate alert tests sent additional synthetic records after the original full batch.
@@ -95,14 +152,14 @@ A full simulation batch produced 10 synthetic source events and one HR-correlate
 | Unauthorized privilege escalation | 1 matching synthetic administrator-group addition |
 | Python validation | 5 of 5 local Python validation checks passed |
 | Live Loki API validation | 4 of 4 checks passed using `scripts/validate_loki.py` |
-| Loki API results | 6 password-spray accounts, 1 HR-correlated ghost-account finding, 1 unauthorized admin change, and normal activity below threshold |
+| Loki API results | 6 password-spray accounts, 1 HR-correlated ghost-account finding, 1 approval-correlated admin-change finding, and normal activity below threshold |
 | Loki API evidence | [View screenshot](evidence/screenshots/06-loki-api-validation.png) |
 | Five-minute boundary test | 2 of 2 Loki time-window checks passed (6 accounts counted, then 4 after earlier attempts aged out) |
 | Loki ingestion | HTTP 204 |
-| Loki records accepted per full batch | 11 records (10 source events + 1 HR-correlated finding) |
+| Loki records accepted per full batch | 12 records (10 source events + 1 HR-correlated finding + 1 approval-correlated admin-change finding) |
 | Detection queries | 3 successfully tested |
 | Grafana monitoring | 3 working investigation panels |
-| Automated alert coverage | 3 Grafana-managed rules; password spray previously validated and the newer ghost-account/admin-change rules verified firing and recovery |
+| Automated alert coverage | 3 Grafana-managed rules; all three verified Firing with the upgraded batch, and ghost-account/admin-change recovery verified |
 
 ### Security Detection Dashboard
 
@@ -255,21 +312,44 @@ The correlation logic:
 
 **Scope:** The HR reference file and authentication events are lab data. The correlation logic was executed and its finding retrieved from Loki; live HR and identity-provider log integration was not implemented.
 
-### Detection 3 — Unauthorized Privilege Escalation
+### Detection 3 — Approval-Correlated Administrator Change
 
-**Objective:** Detect unapproved membership additions to the Administrators group.
+**Objective:** Identify additions to the Administrators group that lack a valid matching change approval.
+
+The original detection relied on an `approved="no"` field inside the group-change event. This was replaced with independent approval correlation.
+
+**Detection design:**
+
+1. The synthetic event records a group-membership change and its change-ticket ID.
+2. The separate `data/admin_change_approvals.csv` file represents change-approval records.
+3. `scripts/correlate_privilege_changes.py` compares the event with the approval data.
+4. A `suspicious_admin_change_finding` is generated when no valid matching approval exists.
+5. The derived finding is ingested into Loki and evaluated by Grafana.
+
+**Saved administrator-change alert query:**
 
 ```logql
-{job="identity_detection_lab", scenario="billy_kaplan"}
-| json
-| event_type="group_membership_added"
-| target_group="Administrators"
-| approved="no"
+sum(
+  count_over_time(
+    {job="identity_detection_lab", scenario="billy_kaplan"}
+    | json
+    | event_type="suspicious_admin_change_finding"
+    | event_source="approval_correlation_lab"
+    | target_group="Administrators"
+    [5m]
+  )
+) or on() vector(0)
 ```
 
-**Observed Result:** One synthetic administrator-group membership addition associated with `billy.kaplan`, marked `approved="no"`. The derived five-minute alert rule was subsequently tested with a single controlled event.
+**Observed Result:** Billy Kaplan's synthetic group-change event referenced `CHG-9001`, but the corresponding approval authorized the Remote Desktop Users group, not Administrators.
 
-The `approved="no"` value was supplied by the synthetic event generator; production detection would require verification against authoritative access-request or change-management records.
+The Python correlation identified the mismatch and generated one `suspicious_admin_change_finding`.
+
+The updated detection passed seven local approval-correlation checks. The saved LogQL query returned one finding through the live Loki API, and the Grafana administrator-change alert entered Alerting before returning to Normal.
+
+**Security Significance:** Authorization is determined by comparing independent event and approval records rather than trusting an approval flag supplied by the event generator.
+
+**Scope:** The approval CSV and security events are synthetic. Live ServiceNow integration was not implemented. A missing or mismatched approval represents a suspicious change requiring investigation, not definitive proof of malicious activity.
 
 ## 7. Automated Alerting and Validation
 
@@ -281,9 +361,9 @@ I configured **three Grafana-managed alert rules** in **Detection Lab → Ghost 
 |---|---|---|
 | Ghost Account - Password Spray Detection | More than four distinct usernames failing from one source IP within five minutes | Previously observed in Alerting/Firing with six simulated accounts |
 | Ghost Account - Post-Termination Login | One or more `ghost_account_finding` records in five minutes | Entered Alerting with one finding and returned to Normal after the window expired |
-| Ghost Account - Unauthorized Admin Change | One or more simulated unapproved Administrators additions in five minutes | Entered Alerting with one event and returned to Normal after the window expired |
+| Ghost Account - Unauthorized Admin Change | One or more `suspicious_admin_change_finding` records in five minutes | Entered Alerting with one approval-correlated finding and returned to Normal after the window expired |
 
-The post-termination and administrator-change rules used a **0-second pending period** and a **one-minute evaluation interval**. They were tested with separate, narrowly scoped synthetic event submissions rather than replaying the full 11-record scenario. Their contact point, **Detection Lab - No Notifications**, had no notification integrations. External notification delivery was not tested.
+The post-termination and administrator-change rules use a **0-second pending period** and a **one-minute evaluation interval**. Earlier alerts were tested with narrowly scoped synthetic submissions; the upgraded approval-correlated rule was subsequently tested using the full 12-record batch. The contact point, **Detection Lab - No Notifications**, was selected for testing. External notification delivery was not tested.
 
 ### Numeric Alert Queries
 
@@ -300,7 +380,7 @@ sum(
 ) or on() vector(0)
 ```
 
-The administrator-change rule uses the same aggregation pattern but filters for `event_type="group_membership_added"`, `target_group="Administrators"`, and `approved="no"`. Both rules fire when the query value is **above 0**.
+The administrator-change rule uses the same aggregation pattern but filters for `event_type="suspicious_admin_change_finding"`, `event_source="approval_correlation_lab"`, and `target_group="Administrators"`. Python performs the independent approval correlation before the finding reaches Loki. Both rules fire when the query value is **above 0**.
 
 ### Verified Alert Evidence
 
@@ -314,6 +394,28 @@ The administrator-change rule uses the same aggregation pattern but filters for 
 | Unauthorized administrator alert history: Alerting → Normal | [View](evidence/screenshots/14-admin-change-alert-history.png) |
 
 **Validation boundary:** These observations establish alert evaluation and state changes in the Grafana lab. They do not establish production false-positive performance, actual privilege changes in Authentik, or successful external notification delivery.
+
+### Continuous Integration - GitHub Actions
+
+To make detection validation reproducible for reviewers, I configured GitHub Actions to automatically run offline Python checks on every push and pull request. The workflow can also be triggered manually.
+
+**Workflow:** `.github/workflows/detection-tests.yml`
+
+The workflow uses Python 3.12 and performs:
+
+| Automated check | Validated behavior |
+|---|---|
+| Python syntax | Compiles the scripts to detect syntax errors |
+| Detection validation | 5 local detection checks |
+| HR correlation | 3 identity-lifecycle correlation checks |
+| Administrator approval correlation | 7 approval-matching checks |
+| False-positive analysis | 4 synthetic detection scenarios |
+
+**Observed Result:** The GitHub Actions workflow completed successfully on the main branch, providing a visible passing status for the offline tests.
+
+**Scope:** These checks require no live services or external credentials. They do not connect to the instructor's Loki instance or test Grafana alert execution.
+
+Live Loki API validation and Grafana alert firing/recovery were tested separately and documented in the project evidence.
 
 ## 8. Technical Challenges and Lessons Learned
 
@@ -404,6 +506,18 @@ The simulated security events demonstrated how a defender might investigate acti
 **Unauthorized administrator alert history**
 
 ![Admin Change Alert History](evidence/screenshots/14-admin-change-alert-history.png)
+
+### Approval-Correlated Administrator Detection - Updated Evidence
+
+The administrator-change detection now correlates security events against independent change-approval records before producing a finding.
+
+| Evidence | Observed result |
+|---|---|
+| [Admin alert firing](evidence/screenshots/16-approval-correlated-admin-alert-firing.png) | The approval-correlated administrator-change alert entered Firing |
+| [Admin alert state history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) | The updated alert transitioned from Alerting to Normal |
+| [Live Loki API validation](evidence/screenshots/18-approval-correlated-loki-validation.png) | All 4 live Loki API validation tests passed, including the new approval-correlated detection |
+
+These screenshots document the upgraded detection's behavior in the synthetic lab. The approval records were simulated; no live ITSM approval integration was implemented.
 
 ## 10. Reproducing the Detection Simulation
 
