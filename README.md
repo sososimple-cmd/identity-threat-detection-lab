@@ -96,7 +96,7 @@ flowchart TB
     end
 ```
 
-**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. Each full simulation batch generates 10 source events and one derived ghost-account finding (11 Loki records). Separate controlled events were later sent to verify individual alert firing. All three detection scenarios have Grafana-managed alert rules; the two newer rules use a contact point with no notification integrations.
+**Architecture notes:** OrangeHRM and Authentik were manually inspected for identity context; neither is directly integrated with this synthetic event pipeline. A separate HR termination CSV is correlated with synthetic authentication events in Python. Each full simulation batch generates 10 source events and two derived findings (one HR-correlated ghost-account finding and one approval-correlated admin-change finding; 12 Loki records total). Separate controlled events were later sent to verify individual alert firing. All three detection scenarios have Grafana-managed alert rules; the two newer rules use a contact point with no notification integrations.
 
 ### Independent Change-Approval Correlation
 
