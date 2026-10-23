@@ -1,1 +1,5 @@
-{job="identity_detection_lab", scenario="billy_kaplan"} | json | event_type="group_membership_added" | target_group="Administrators" | approved="no"
+{job="identity_detection_lab", scenario="billy_kaplan"}
+| json
+| event_type="suspicious_admin_change_finding"
+| event_source="approval_correlation_lab"
+| target_group="Administrators"

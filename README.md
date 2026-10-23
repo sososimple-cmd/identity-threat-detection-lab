@@ -1,5 +1,7 @@
 # The Ghost Account: Identity Threat Detection Lab
 
+![Detection tests](https://github.com/sososimple-cmd/identity-threat-detection-lab/actions/workflows/detection-tests.yml/badge.svg)
+
 ### The Employee Left. Their Access Didn't.
 
 **Detecting password spraying, suspicious terminated-account authentication, and unauthorized privilege changes using Python, Grafana Loki, and LogQL.**
@@ -142,7 +144,17 @@ Loki does not perform the HR or approval join in this design. It stores and quer
 
 **Production considerations**
 
-The lab uses static, synthetic CSV files. A production implementation would require:
+The lab uses static, synthetic CSV files.
+
+**Proposed production lookup architecture:** In production, HR termination records and change approvals would be maintained in secured lookup tables, such as a database or SIEM watchlist. Scheduled integrations would refresh these lookups from the authoritative HRIS and ITSM systems at least daily, or more frequently according to detection requirements.
+
+The ingestion pipeline could join incoming events against those refreshed lookup tables. An alternative would be performing the correlation at query time using centrally maintained SIEM lookup data. Neither integration was implemented in this lab.
+
+**Ingest-time enrichment trade-off:** This project determines findings using the lookup data available when each event is processed. If HR records a termination late, earlier authentication events will not automatically be reclassified. A production implementation would need periodic historical re-evaluation or event replay to identify findings affected by late-arriving records.
+
+**Lookup availability:** A missing approval in a current, complete approval dataset is different from an unavailable or outdated dataset. Failed or stale lookup updates should generate a separate data-quality condition requiring investigation, rather than silently approving activity or treating every unmatched change as confirmed malicious behavior.
+
+A production implementation would require:
 
 - Authorized, regularly refreshed HRIS and ITSM approval feeds.
 - Secure service identities and read-only access to authoritative systems.

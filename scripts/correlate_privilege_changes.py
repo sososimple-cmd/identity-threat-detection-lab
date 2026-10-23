@@ -101,16 +101,17 @@ if __name__ == "__main__":
 
     valid = sample("maria", "CHG-1001")
 
-    # Deliberately lie in the log field.
-    # The independent approval must still determine the result.
-    valid[0][1]["approved"] = "no"
+    # Simulate a forged approval claim in the security event.
+    # CHG-9003 is rejected in the independent approval CSV.
+    forged = sample("billy.kaplan", "CHG-9003")
+    forged[0][1]["approved"] = "yes"
 
     checks = {
         "Valid approval stays quiet":
             not flagged(valid),
 
-        "Untrusted approved field ignored":
-            not flagged(valid),
+        "Forged approved=yes rejected ticket detected":
+            flagged(forged),
 
         "Wrong-group approval detected":
             flagged(sample("billy.kaplan", "CHG-9001")),
