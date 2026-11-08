@@ -7,7 +7,7 @@
 I built a controlled identity-threat detection pipeline to investigate **password spraying**, **successful authentication after employee termination**, and **administrator-group changes without valid approval**.
 
 **Stack:** Python 3 · Grafana Loki · LogQL · Grafana · synthetic HR and change-approval CSVs  
-**Artifacts:** [Detection queries](queries/) · [Python scripts](scripts/) · [GitHub Actions tests](.github/workflows/detection-tests.yml)
+**Artifacts:** [Detection queries](queries/) · [Exported Grafana alert rules](alerts/ghost-account-rules.yaml) · [Python scripts](scripts/) · [GitHub Actions tests](.github/workflows/detection-tests.yml)
 
 ## The problem
 
@@ -178,6 +178,8 @@ The live validation uses recent test data; the window-boundary script queries hi
 
 **This is a controlled, synthetic detection lab, not a production SOC integration.** OrangeHRM termination and Authentik inactive-account status were inspected manually; neither feeds the pipeline automatically. HR and change approvals are represented by separate CSV fixtures, **not** live HRIS or ServiceNow feeds. Python performs correlation before ingestion; Loki does not join these sources itself. No real account was compromised or elevated, and the demo uses documentation-only IPs. Grafana alert firing/recovery was tested, but external alert notification delivery and production false-positive rates were not.
 
-For production readiness, I would add securely refreshed authoritative HR and ITSM lookup sources, timestamp-aware reconciliation for late-arriving changes, monitoring for stale/missing reference data, measured threshold tuning, and version-controlled Grafana rule provisioning. The workflow's offline GitHub Actions checks validate Python logic; live Loki/Grafana behavior was tested separately.
+For production readiness, I would add securely refreshed authoritative HR and ITSM lookup sources, timestamp-aware reconciliation for late-arriving changes, monitoring for stale/missing reference data, measured threshold tuning, and portability testing of the [exported Grafana alert rules](alerts/ghost-account-rules.yaml) in a fresh authorized environment. The workflow's offline GitHub Actions checks validate Python logic; live Loki/Grafana behavior was tested separately.
 
 **Outcome:** This project demonstrates how I translate an identity-security problem into independently correlated findings, LogQL detections, alert validation, and reproducible tests — including discovering and correcting a trust-boundary mistake in my own original design.
+
+**Project credit:** Built during IAM Career Launchpad Pro at [All Things Identity](https://allthingsidentity.com).
