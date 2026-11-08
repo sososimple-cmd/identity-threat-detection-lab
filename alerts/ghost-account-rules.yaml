@@ -1,0 +1,160 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Ghost Account Detection Rules
+      folder: Detection Lab
+      interval: 1m
+      rules:
+        - uid: ag1qr8h37rmyod
+          title: Ghost Account - Password Spray Detection
+          condition: C
+          data:
+            - refId: A
+              queryType: instant
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: dg1qnfs9gav40b
+              model:
+                datasource:
+                    type: loki
+                    uid: dg1qnfs9gav40b
+                editorMode: code
+                expr: "count by (source_ip) (\r\n  sum by (source_ip, username) (\r\n    count_over_time(\r\n      {job=\"identity_detection_lab\", scenario=\"billy_kaplan\"}\r\n      | json\r\n      | event_type=\"login\"\r\n      | status=\"failed\"\r\n      [5m]\r\n    ) > bool 0\r\n  )\r\n)"
+                instant: true
+                intervalMs: 1000
+                maxDataPoints: 43200
+                queryType: instant
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 4
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: OK
+          execErrState: Error
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: eg1x94uw8ne9sc
+          title: Ghost Account - Post-Termination Login
+          condition: C
+          data:
+            - refId: A
+              queryType: instant
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: dg1qnfs9gav40b
+              model:
+                datasource:
+                    type: loki
+                    uid: dg1qnfs9gav40b
+                editorMode: code
+                expr: "\r\nsum(\r\n  count_over_time(\r\n    {job=\"identity_detection_lab\", scenario=\"billy_kaplan\"}\r\n    | json\r\n    | event_type=\"ghost_account_finding\"\r\n    [5m]\r\n  )\r\n) or on() vector(0)\r\n"
+                instant: true
+                intervalMs: 1000
+                maxDataPoints: 43200
+                queryType: instant
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          isPaused: false
+          notification_settings:
+            receiver: Detection Lab - No Notifications
+        - uid: fg1xbgolplm2od
+          title: Ghost Account - Unauthorized Admin Change
+          condition: C
+          data:
+            - refId: A
+              queryType: instant
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: dg1qnfs9gav40b
+              model:
+                datasource:
+                    type: loki
+                    uid: dg1qnfs9gav40b
+                editorMode: code
+                expr: "\r\nsum(\r\n  count_over_time(\r\n    {job=\"identity_detection_lab\", scenario=\"billy_kaplan\"}\r\n    | json\r\n    | event_type=\"suspicious_admin_change_finding\"\r\n    | event_source=\"approval_correlation_lab\"\r\n    | target_group=\"Administrators\"\r\n    [5m]\r\n  )\r\n) or on() vector(0)\r\n\r\n"
+                instant: true
+                intervalMs: 1000
+                maxDataPoints: 43200
+                queryType: instant
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          isPaused: false
+          notification_settings:
+            receiver: Detection Lab - No Notifications
