@@ -90,20 +90,21 @@ sum(
 
 ## Results and evidence
 
+The six linked screenshots below focus on current detection behavior, query validation, and alert execution. Other validation logic is available in the version-controlled scripts.
+
 | Check | Verified outcome | Evidence |
 |---|---|---|
-| Password spray | 6 distinct accounts; rolling window later counted 4 | [Window test](evidence/screenshots/08-spray-window-boundary-test.png) |
-| Post-termination login | 1 independently HR-correlated finding | [Correlation evidence](evidence/screenshots/04-ghost-finding-grafana.png) |
-| Administrator addition | 1 approval-correlated finding for mismatched group | [Updated Loki validation](evidence/screenshots/18-approval-correlated-loki-validation.png) |
-| Loki ingestion | HTTP 204; 12 records per full batch | [API validation](evidence/screenshots/06-loki-api-validation.png) |
-| Local detection checks | 5 passed | [Local validation](evidence/screenshots/05-local-validation.png) |
-| Live Loki API checks | 4 passed | [API validation](evidence/screenshots/18-approval-correlated-loki-validation.png) |
-| Approval correlation checks | 7 passed, including forged event-level approval | [Validation script](scripts/correlate_privilege_changes.py) |
-| Grafana alert rules | 3 configured; each observed firing in lab tests | [Rules](evidence/screenshots/12-three-automated-alerts.png) |
-| Alert recovery | Ghost-account and admin-change rules returned to Normal | [Ghost history](evidence/screenshots/11-ghost-account-alert-history.png) · [Admin history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) |
-| Offline CI | Python compilation plus detection, HR, approval, and false-positive test scripts | [Actions workflow](.github/workflows/detection-tests.yml) |
+| Password spray | 6 distinct accounts detected; rolling window later counted 4 | [Five-minute window test](evidence/screenshots/08-spray-window-boundary-test.png) |
+| Post-termination login | 1 independently HR-correlated finding | [Updated dashboard](evidence/screenshots/identity-threat-dashboard-corrected-2026-11-08.png) |
+| Unauthorized administrator addition | 1 finding generated after independent approval correlation | [Grafana Explore: approval-correlated finding](evidence/screenshots/04-approval-correlated-admin-finding-explore.png) |
+| Live Loki API checks | 4 passed, including approval-correlated detection | [Loki validation](evidence/screenshots/18-approval-correlated-loki-validation.png) |
+| Local detection checks | 5 passed | [Validation script](scripts/validate_detection.py) |
+| Approval correlation checks | 7 passed, including a forged event-level approval claim | [Correlation script](scripts/correlate_privilege_changes.py) |
+| Grafana alert rules | 3 configured; each observed firing in controlled testing | [Three configured rules](evidence/screenshots/12-three-automated-alerts.png) · [Exported YAML](alerts/ghost-account-rules.yaml) |
+| Alert recovery | Correlated admin-change rule returned to Normal | [Alert state history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) |
+| Offline CI | Python syntax, detection, HR, approval, and false-positive checks | [Actions workflow](.github/workflows/detection-tests.yml) |
 
-![Grafana identity threat detection dashboard](evidence/screenshots/identity-threat-dashboard-corrected-2026-11-08.png)
+![Current Grafana identity threat detection dashboard](evidence/screenshots/identity-threat-dashboard-corrected-2026-11-08.png)
 
 ## What broke — and how I fixed it
 
