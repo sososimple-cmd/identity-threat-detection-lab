@@ -103,7 +103,7 @@ sum(
 | Alert recovery | Ghost-account and admin-change rules returned to Normal | [Ghost history](evidence/screenshots/11-ghost-account-alert-history.png) · [Admin history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) |
 | Offline CI | Python compilation plus detection, HR, approval, and false-positive test scripts | [Actions workflow](.github/workflows/detection-tests.yml) |
 
-![Grafana identity threat detection dashboard](evidence/screenshots/08-billy-detection-dashboard.png)
+![Grafana identity threat detection dashboard](evidence/screenshots/identity-threat-dashboard-corrected-2026-11-08.png)
 
 ## What broke — and how I fixed it
 
