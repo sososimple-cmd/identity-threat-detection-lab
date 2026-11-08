@@ -17,7 +17,7 @@ def find_suspicious_admin_changes(event_rows):
         reader = csv.DictReader(file)
         required = {
             "change_id", "actor", "target_user", "target_group",
-            "event_type", "status", "valid_from", "valid_until"
+            "event_type", "status", "approver", "valid_from", "valid_until"
         }
         if not required.issubset(reader.fieldnames or []):
             raise ValueError("Approval CSV is missing required columns")
@@ -35,6 +35,7 @@ def find_suspicious_admin_changes(event_rows):
         change_id = str(event.get("change_id", "")).strip()
         actor = str(event.get("actor", "")).strip().casefold()
         target_user = str(event.get("target_user", "")).strip().casefold()
+        requester = str(event.get("requester", actor)).strip().casefold()
 
         valid_approval = False
 
@@ -53,6 +54,11 @@ def find_suspicious_admin_changes(event_rows):
                     == "group_membership_added"
                 and record["status"].strip().casefold() == "approved"
             ):
+                continue
+
+            # A self-approval or missing approver cannot authorize this change.
+            approver = record["approver"].strip().casefold()
+            if not approver or approver in {actor, requester}:
                 continue
 
             start = datetime.fromisoformat(
@@ -107,8 +113,14 @@ if __name__ == "__main__":
     forged[0][1]["approved"] = "yes"
 
     checks = {
-        "Valid approval stays quiet":
+        "Independent approver on valid ticket stays quiet":
             not flagged(valid),
+
+        "Self-approved administrator change detected":
+            flagged(sample("maria", "CHG-1002")),
+
+        "Missing approver detected":
+            flagged(sample("maria", "CHG-1003")),
 
         "Forged approved=yes rejected ticket detected":
             flagged(forged),
@@ -137,4 +149,4 @@ if __name__ == "__main__":
     if not all(checks.values()):
         raise SystemExit(1)
 
-    print("ALL 7 ADMIN-CORRELATION CHECKS PASSED")
+    print(f"ALL {len(checks)} ADMIN-CORRELATION CHECKS PASSED")
