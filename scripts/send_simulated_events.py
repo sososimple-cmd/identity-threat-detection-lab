@@ -152,7 +152,7 @@ def main():
 
         return
 
-    # Verify instructor-authorized Loki endpoint
+    # Verify authorized lab Loki endpoint
     url = os.getenv("LOKI_PUSH_URL", "").strip()
 
     if (
@@ -160,7 +160,7 @@ def main():
         or not url.endswith("/loki/api/v1/push")
     ):
         parser.error(
-            "Set LOKI_PUSH_URL to the instructor-authorized "
+            "Set LOKI_PUSH_URL to an authorized lab "
             "Loki push endpoint ending /loki/api/v1/push."
         )
 
