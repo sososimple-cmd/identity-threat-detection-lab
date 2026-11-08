@@ -54,7 +54,7 @@ count by (source_ip) (
 
 ### 2. Ghost account — authentication correlated with HR termination
 
-`scripts/correlate_identity_events.py` compares successful synthetic logins with the independent `data/terminated_users.csv` reference file and emits a `ghost_account_finding` when the login occurs after termination.
+`scripts/correlate_identity_events.py` compares timezone-aware login timestamps with an explicit UTC termination timestamp in the independent `data/terminated_users.csv` fixture and emits a `ghost_account_finding` only when the login occurs strictly after termination.
 
 ```logql
 sum(
@@ -71,7 +71,7 @@ sum(
 
 ### 3. Administrator change — independent approval correlation
 
-`scripts/correlate_privilege_changes.py` checks the group-change event against `data/admin_change_approvals.csv`. It compares the ticket, actor, target, group, event type, approval status, and validity dates. A mismatch or missing valid approval generates a `suspicious_admin_change_finding`.
+`scripts/correlate_privilege_changes.py` checks the group-change event against `data/admin_change_approvals.csv`. It compares the ticket, actor, target, group, event type, approval status, separate approver identity, separation of duties (approver differs from actor/requester), and validity dates. A mismatch or missing valid approval generates a `suspicious_admin_change_finding`.
 
 ```logql
 sum(
@@ -99,7 +99,7 @@ The six linked screenshots below focus on current detection behavior, query vali
 | Unauthorized administrator addition | 1 finding generated after independent approval correlation | [Grafana Explore: approval-correlated finding](evidence/screenshots/04-approval-correlated-admin-finding-explore.png) |
 | Live Loki API checks | 4 passed, including approval-correlated detection | [Loki validation](evidence/screenshots/18-approval-correlated-loki-validation.png) |
 | Local detection checks | 5 passed | [Validation script](scripts/validate_detection.py) |
-| Approval correlation checks | 7 passed, including a forged event-level approval claim | [Correlation script](scripts/correlate_privilege_changes.py) |
+| Approval correlation checks | 9 checks implemented, including forged approval and self-approval cases; CI revalidation pending | [Correlation script](scripts/correlate_privilege_changes.py) |
 | Grafana alert rules | 3 configured; each observed firing in controlled testing | [Three configured rules](evidence/screenshots/12-three-automated-alerts.png) · [Exported YAML](alerts/ghost-account-rules.yaml) |
 | Alert recovery | Correlated admin-change rule returned to Normal | [Alert state history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) |
 | Offline CI | Python syntax, detection, HR, approval, and false-positive checks | [Actions workflow](.github/workflows/detection-tests.yml) |
@@ -112,9 +112,9 @@ The six linked screenshots below focus on current detection behavior, query vali
 
 **What broke:** My first administrator-change detection trusted `approved="no"` inside the security event. That was convenient for a demonstration, but a security event is **not an independent source of change authorization**. If the event had simply reported `approved="yes"`, a rule depending on that field could miss an unauthorized change.
 
-**How I fixed it:** I removed the event-level approval field and built a separate approval-correlation step. The group-change event carries an ID and the details of the attempted change; a separate simulated ITSM approval CSV states what was actually approved. Python joins those datasets and verifies that the actor, target, group, event type, ticket, status, and approval dates all match.
+**How I fixed it:** I removed the event-level approval field and built a separate approval-correlation step. The group-change event carries an ID and the details of the attempted change; a separate simulated ITSM approval CSV states what was actually approved. Python joins those datasets and verifies that the actor, target, group, event type, ticket, status, and approval dates all match. The revised fixture also names an independent approver; approval by the requester/actor or an empty approver is rejected.
 
-**How I tested it:** I tested approved and rejected changes, missing or mismatched tickets, expired approvals, and non-admin events. Most importantly, I added a **forged `approved=yes` test** to prove the detection does not rely on an approval claim supplied by the event. Seven local checks passed. The updated finding was then verified through the Loki API, and its Grafana alert fired and recovered.
+**How I tested it:** I tested approved and rejected changes, missing or mismatched tickets, expired approvals, and non-admin events. Most importantly, I added a **forged `approved=yes` test** to prove the detection does not rely on an approval claim supplied by the event. The original seven checks passed; I subsequently added self-approval and missing-approver regression checks, pending CI confirmation. The previously implemented finding was also verified through the Loki API, and its Grafana alert fired and recovered.
 
 **Why it matters:** The detection now answers a defensible investigation question — *does this privileged change match an independent, valid approval?* — rather than accepting the source event's word for it. A mismatch is a reason to investigate, not proof of malicious intent.
 
@@ -122,9 +122,9 @@ The six linked screenshots below focus on current detection behavior, query vali
 
 **What broke:** A successful login alone does not say whether the account belongs to someone who has left the company. Embedding `employment_status="terminated"` inside the synthetic authentication event would make the finding trivial and unrealistic.
 
-**How I fixed it:** I kept termination dates in `data/terminated_users.csv`, matched the username independently, compared event time against termination time, and generated a separate `ghost_account_finding`. The original authentication event contains no HR-status verdict.
+**How I fixed it:** I kept termination dates in `data/terminated_users.csv`, matched the username independently, compared full timezone-aware event and termination timestamps, and generated a separate `ghost_account_finding`. The lab's termination timestamp is an explicit synthetic fixture value. The original authentication event contains no HR-status verdict.
 
-**How I tested it:** The local HR correlation checks included negative cases; the derived finding was retrieved from Loki and the post-termination alert entered Firing before recovering.
+**How I tested it:** The HR regression checks now cover same-day before, at, and after termination as well as timezone offsets (pending CI confirmation). Earlier synthetic lab tests retrieved the finding from Loki, and the post-termination alert entered Firing before recovering.
 
 **Why it matters:** Identity detection becomes stronger when authentication telemetry is combined with independently maintained lifecycle context.
 
@@ -179,7 +179,7 @@ The live validation uses recent test data; the window-boundary script queries hi
 
 **This is a controlled, synthetic detection lab, not a production SOC integration.** OrangeHRM termination and Authentik inactive-account status were inspected manually; neither feeds the pipeline automatically. HR and change approvals are represented by separate CSV fixtures, **not** live HRIS or ServiceNow feeds. Python performs correlation before ingestion; Loki does not join these sources itself. No real account was compromised or elevated, and the demo uses documentation-only IPs. Grafana alert firing/recovery was tested, but external alert notification delivery and production false-positive rates were not.
 
-For production readiness, I would add securely refreshed authoritative HR and ITSM lookup sources, timestamp-aware reconciliation for late-arriving changes, monitoring for stale/missing reference data, measured threshold tuning, and portability testing of the [exported Grafana alert rules](alerts/ghost-account-rules.yaml) in a fresh authorized environment. The workflow's offline GitHub Actions checks validate Python logic; live Loki/Grafana behavior was tested separately.
+For production readiness, I would add securely refreshed authoritative HR and ITSM lookup sources, independent verification of approver authority and requester identity, timestamp-aware reconciliation for late-arriving changes, monitoring for stale/missing reference data, measured threshold tuning, and portability testing of the [exported Grafana alert rules](alerts/ghost-account-rules.yaml) in a fresh authorized environment. The workflow's offline GitHub Actions checks validate Python logic; live Loki/Grafana behavior was tested separately.
 
 **Outcome:** This project demonstrates how I translate an identity-security problem into independently correlated findings, LogQL detections, alert validation, and reproducible tests — including discovering and correcting a trust-boundary mistake in my own original design.
 
