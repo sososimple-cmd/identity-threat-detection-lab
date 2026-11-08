@@ -75,7 +75,7 @@ def main():
         print("\nDRY RUN OK: 2 lab records prepared; nothing sent.")
         return
 
-    # STEP 4: Require the instructor-authorized Loki endpoint.
+    # STEP 4: Require an authorized lab endpoint.
     url = os.environ.get("LOKI_PUSH_URL", "").strip()
 
     if (
@@ -83,7 +83,7 @@ def main():
         or not url.endswith("/loki/api/v1/push")
     ):
         raise SystemExit(
-            "ERROR: Instructor-authorized LOKI_PUSH_URL is missing."
+            "ERROR: LOKI_PUSH_URL for an authorized lab endpoint is missing."
         )
 
     # STEP 5: Send the original event and derived finding.
