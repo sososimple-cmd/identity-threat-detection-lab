@@ -99,7 +99,7 @@ The six linked screenshots below focus on current detection behavior, query vali
 | Unauthorized administrator addition | 1 finding generated after independent approval correlation | [Grafana Explore: approval-correlated finding](evidence/screenshots/04-approval-correlated-admin-finding-explore.png) |
 | Live Loki API checks | 4 passed, including approval-correlated detection | [Loki validation](evidence/screenshots/18-approval-correlated-loki-validation.png) |
 | Local detection checks | 5 passed | [Validation script](scripts/validate_detection.py) |
-| Approval correlation checks | 9 checks implemented, including forged approval and self-approval cases; CI revalidation pending | [Correlation script](scripts/correlate_privilege_changes.py) |
+| Approval correlation checks | 9 checks passed in GitHub Actions, including forged approval, self-approval and missing-approver cases | [Correlation script](scripts/correlate_privilege_changes.py) |
 | Grafana alert rules | 3 configured; each observed firing in controlled testing | [Three configured rules](evidence/screenshots/12-three-automated-alerts.png) · [Exported YAML](alerts/ghost-account-rules.yaml) |
 | Alert recovery | Correlated admin-change rule returned to Normal | [Alert state history](evidence/screenshots/17-approval-correlated-admin-alert-history.png) |
 | Offline CI | Python syntax, detection, HR, approval, and false-positive checks | [Actions workflow](.github/workflows/detection-tests.yml) |
@@ -114,7 +114,7 @@ The six linked screenshots below focus on current detection behavior, query vali
 
 **How I fixed it:** I removed the event-level approval field and built a separate approval-correlation step. The group-change event carries an ID and the details of the attempted change; a separate simulated ITSM approval CSV states what was actually approved. Python joins those datasets and verifies that the actor, target, group, event type, ticket, status, and approval dates all match. The revised fixture also names an independent approver; approval by the requester/actor or an empty approver is rejected.
 
-**How I tested it:** I tested approved and rejected changes, missing or mismatched tickets, expired approvals, and non-admin events. Most importantly, I added a **forged `approved=yes` test** to prove the detection does not rely on an approval claim supplied by the event. The original seven checks passed; I subsequently added self-approval and missing-approver regression checks, pending CI confirmation. The previously implemented finding was also verified through the Loki API, and its Grafana alert fired and recovered.
+**How I tested it:** I tested approved and rejected changes, missing or mismatched tickets, expired approvals, and non-admin events. Most importantly, I added a **forged `approved=yes` test** to prove the detection does not rely on an approval claim supplied by the event. All nine approval-correlation checks passed in GitHub Actions, including the newer self-approval and missing-approver cases. The previously implemented finding was also verified through the Loki API, and its Grafana alert fired and recovered.
 
 **Why it matters:** The detection now answers a defensible investigation question — *does this privileged change match an independent, valid approval?* — rather than accepting the source event's word for it. A mismatch is a reason to investigate, not proof of malicious intent.
 
@@ -124,7 +124,7 @@ The six linked screenshots below focus on current detection behavior, query vali
 
 **How I fixed it:** I kept termination dates in `data/terminated_users.csv`, matched the username independently, compared full timezone-aware event and termination timestamps, and generated a separate `ghost_account_finding`. The lab's termination timestamp is an explicit synthetic fixture value. The original authentication event contains no HR-status verdict.
 
-**How I tested it:** The HR regression checks now cover same-day before, at, and after termination as well as timezone offsets (pending CI confirmation). Earlier synthetic lab tests retrieved the finding from Loki, and the post-termination alert entered Firing before recovering.
+**How I tested it:** The HR regression checks cover same-day before, at, and after termination as well as timezone offsets, and passed in GitHub Actions. Earlier synthetic lab tests retrieved the finding from Loki, and the post-termination alert entered Firing before recovering.
 
 **Why it matters:** Identity detection becomes stronger when authentication telemetry is combined with independently maintained lifecycle context.
 
