@@ -128,9 +128,19 @@ The six linked screenshots below focus on current detection behavior, query vali
 
 **Why it matters:** Identity detection becomes stronger when authentication telemetry is combined with independently maintained lifecycle context.
 
+### Grafana showed no logs despite a configured Loki data source
+
+**What I observed:** While updating the dashboard, Grafana Explore returned **"No data"** for the independently correlated administrator finding. Even a broad query for all events with `{job="identity_detection_lab", scenario="billy_kaplan"}` returned no records in the selected six-month range. The dashboard used the Loki data source named `Loki-Public-Test`, rather than the original lab data-source name.
+
+**How I isolated the issue:** In Grafana's data-source settings, **Save & test** reported **"Data source successfully connected."** A PowerShell TCP connectivity check to the configured Loki port also succeeded. That narrowed the immediate problem: connectivity worked, but the expected synthetic events were not available in the queried results. In the VS Code terminal, `LOKI_PUSH_URL` was blank, so that session was not configured to send events. I located the updated project folder and confirmed the generator imported the independent approval-correlation function.
+
+**What I changed and verified:** I used the Windows `py` launcher (the `python` command was not found), ran `send_simulated_events.py --dry-run`, and inspected **12 records**: 10 synthetic source events plus an HR-correlated finding and an approval-correlated administrator finding. After setting the **authorized lab** Loki push endpoint in PowerShell and submitting a fresh batch, Grafana displayed `suspicious_admin_change_finding`, `ghost_account_finding`, and the six-account password-spray series. I saved the corrected administrator panel to query the **derived approval-correlated finding**, not the old raw `group_membership_added` event with an event-level approval flag.
+
+**What I can and cannot conclude:** The new batch and corrected query resolved the observed **No data** problem. The original Grafana connection error text was not retained, so I cannot attribute that earlier issue to a specific configuration mistake or claim that creating `Loki-Public-Test` was the exact fix. This distinction matters: a reachable data source, available log records, and correct detection logic are **three separate things to validate**.
+
 ### A successful query was not the same as a working alert
 
-**What broke:** A LogQL expression returning records did not by itself prove that Grafana would evaluate the rule, cross the threshold, and change alert state. I also had to address initial Grafana-to-Loki data-source connectivity separately from event ingestion.
+**What broke:** A LogQL expression returning records did not by itself prove that Grafana would evaluate the rule, cross the threshold, and change alert state. The separate Grafana data-availability investigation is documented above.
 
 **How I fixed it:** I checked ingestion success (HTTP 204), verified Loki query results, then configured three Grafana-managed rules with appropriate numeric expressions, thresholds, and evaluation settings. I sent fresh controlled test events and inspected alert-state history.
 
